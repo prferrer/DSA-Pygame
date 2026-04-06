@@ -14,7 +14,8 @@ GUN_DURATION = 30000
 gun_ammo = 0
 MAX_AMMO =  8
 move_delay = 100
-last_move_time = 0
+last_move_p1 = 0
+last_move_p2 = 0
 player1_hp = 3
 player2_hp = 3
 game_state = "playing"
@@ -25,6 +26,25 @@ SHRINK_START = 60000
 game_start_time = pygame.time.get_ticks()
 gun_respawn_time = None
 GUN_RESPAWN_DELAY = 3000
+
+#powerups (tanggalin kung ayaw)
+green_powerup = None
+blue_powerup = None
+green_spawn_time = pygame.time.get_ticks() + random.randint(5000, 15000)
+blue_spawn_time = pygame.time.get_ticks() + random.randint(5000, 15000)
+green_despawn_time = None
+blue_despawn_time = None
+POWERUP_DESPAWN = 15000
+POWERUP_RESPAWN = 10000
+speed_boost_p1 = None
+speed_boost_p2 = None
+slow_p1 = None
+slow_p2 = None
+SPEED_BOOST_DURATION = 2000
+SLOW_DURATION = 2000
+NORMAL_MOVE_DELAY = 100
+FAST_MOVE_DELAY = 50
+SLOW_MOVE_DELAY = 200
 
 #Available Colors
 WHITE = (255, 255, 255)
@@ -364,8 +384,8 @@ def check_zone_death():
                     player2[:] = find_safe_respawn(45, 24)
                     gun_owner = None
                     gun_respawn_time = pygame.time.get_ticks() + GUN_RESPAWN_DELAY 
-                    
-                
+            
+        
 def draw_win_screen(winner):
     #Darkness Overlay
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -422,16 +442,112 @@ def shoot(player, direction, owner):
         "owner": owner,
         "distance": 0
     })
+    
+def spawn_powerup(powerup_type):
+    def distance(ax, ay, bx, by):
+        return abs(ax - bx) + abs(ay - by)
+        
+    FAIRNESS_TRESHOLD = 10
+    attempts = 0
+    
+    while True: 
+        x = random.randint(0, MAP_COLS - 1)
+        y = random.randint(0, MAP_ROWS - 1)
+        
+        if is_safe_tile(x, y):
+            dist_p1 = distance(x, y, player1[0], player1[1])
+            dist_p2 = distance(x, y, player2[0], player2[1])
+            
+            if abs(dist_p1 - dist_p2) <= FAIRNESS_TRESHOLD or attempts > 200:
+                return [x, y]
+            
+        attempts += 1
+        
+def draw_powerups():
+    powerup_size = TILE_SIZE // 2
+    
+    if green_powerup is not None:
+        screen.blit(speedboost_image, (
+                offset_x + green_powerup[0] * TILE_SIZE,
+                offset_y+ green_powerup[1] * TILE_SIZE
+            ))
+        
+    if blue_powerup is not None:
+        screen.blit(slowdown_image, (
+                offset_x + blue_powerup[0] * TILE_SIZE,
+                offset_y+ blue_powerup[1] * TILE_SIZE
+            ))
+        
+def update_powerups():
+    global green_powerup, blue_powerup, green_despawn_time, blue_despawn_time, green_spawn_time, blue_spawn_time
+    global speed_boost_p1, speed_boost_p2, slow_p1, slow_p2
+    
+    now = pygame.time.get_ticks()
+    
+    if green_powerup is None and now >= green_spawn_time:
+        green_powerup = spawn_powerup("green")
+        green_despawn_time = now + POWERUP_DESPAWN
+        
+    if green_powerup is not None and green_despawn_time and now >= green_despawn_time:
+        green_powerup = None
+        green_spawn_time = now + POWERUP_RESPAWN
+        
+    if blue_powerup is None and now >= blue_spawn_time:
+        blue_powerup = spawn_powerup("blue")
+        blue_despawn_time = now + POWERUP_DESPAWN
+        
+    if blue_powerup is not None and blue_despawn_time and now >= blue_despawn_time:
+        blue_powerup = None
+        blue_spawn_time = now + POWERUP_RESPAWN
+        
+    if green_powerup is not None:
+        if player1 == green_powerup:
+            speed_boost_p1 = now + SPEED_BOOST_DURATION
+            green_powerup = None
+            green_despawn_time = None
+            green_spawn_time = now + POWERUP_RESPAWN
+        elif player2 == green_powerup:
+            speed_boost_p2 = now + SPEED_BOOST_DURATION
+            green_powerup = None
+            green_despawn_time = None
+            green_spawn_time = now + POWERUP_RESPAWN
+    
+    if blue_powerup is not None:
+        if player1 == blue_powerup:
+            slow_p2 = now + SLOW_DURATION
+            blue_powerup = None
+            blue_despawn_time = None
+            blue_spawn_time = now + POWERUP_RESPAWN
+        elif player2 == blue_powerup:
+            slow_p1 = now + SLOW_DURATION
+            blue_powerup = None
+            blue_despawn_time = None
+            blue_spawn_time = now + POWERUP_RESPAWN
+            
+    if speed_boost_p1 and now >= speed_boost_p1:
+        speed_boost_p1 = None
+    if speed_boost_p2 and now >= speed_boost_p2:
+        speed_boost_p2 = None
+    if slow_p1 and now >= slow_p1:
+        slow_p1 = None
+    if slow_p2 and now >= slow_p2:
+        slow_p2 = None
 
 #Resets All Variables
 def reset_game():
     global game_state, winner_text, gun_owner, gun_ammo, gun_timer, gun_respawn_time
     global player1_hp, player2_hp, game_start_time, zone_radius
+    global green_powerup, blue_powerup, green_spawn_time, blue_spawn_time
+    global green_despawn_time, blue_despawn_time
+    global speed_boost_p1, speed_boost_p2, slow_p1, slow_p2
+    global last_move_p1, last_move_p2
 
     player1[:] = [2, 2]
     player2[:] = [45, 24]
     player1_hp = 3
     player2_hp = 3
+    last_move_p1 = 0
+    last_move_p2 = 0
     gun_owner = None
     gun_ammo = 0
     gun_timer = 0
@@ -440,10 +556,27 @@ def reset_game():
     winner_text = ""
     game_start_time = pygame.time.get_ticks()
     zone_radius = max_radius
+    green_powerup = None
+    blue_powerup = None
+    green_spawn_time = pygame.time.get_ticks() + random.randint(5000, 15000)
+    blue_spawn_time = pygame.time.get_ticks() + random.randint(5000, 15000)
+    green_despawn_time = None
+    blue_despawn_time = None
+    speed_boost_p1 = None
+    speed_boost_p2 = None
+    slow_p1 = None
+    slow_p2 = None
     spawn_gun()
+    
 
 heart_image = pygame.image.load ("hearts.png")
 heart_image = pygame.transform.scale(heart_image, (20, 20))
+
+speedboost_image = pygame.image.load("speedboost.png")
+speedboost_image = pygame.transform.scale(speedboost_image, (TILE_SIZE, TILE_SIZE))
+
+slowdown_image = pygame.image.load("slowdown.png")
+slowdown_image = pygame.transform.scale(slowdown_image, (TILE_SIZE, TILE_SIZE))
 
 #game loopppp
 while True:
@@ -487,7 +620,22 @@ while True:
     #player movement
     #Player 1 (WASD)
         current_time = pygame.time.get_ticks()
-        if current_time - last_move_time >= move_delay:
+        
+        if slow_p1:
+            p1_delay = SLOW_MOVE_DELAY
+        elif speed_boost_p1:
+            p1_delay = FAST_MOVE_DELAY
+        else:
+            p1_delay = NORMAL_MOVE_DELAY
+            
+        if slow_p2:
+            p2_delay = SLOW_MOVE_DELAY
+        elif speed_boost_p2:
+            p2_delay = FAST_MOVE_DELAY
+        else:
+            p2_delay = NORMAL_MOVE_DELAY
+        
+        if current_time - last_move_p1 >= p1_delay:
             if keys[pygame.K_w]:
                 move (player1, 0, -1, player1_dir)
             if keys[pygame.K_s]:
@@ -496,8 +644,10 @@ while True:
                 move (player1, -1, 0, player1_dir)
             if keys[pygame.K_d]:
                 move (player1, 1, 0, player1_dir)
+            last_move_p1 = current_time
     
     #Player 2 (Arrows)
+        if current_time - last_move_p2 >= p2_delay:
             if keys[pygame.K_UP]:
                 move (player2, 0, -1, player2_dir)
             if keys[pygame.K_DOWN]:
@@ -506,8 +656,7 @@ while True:
                 move (player2, -1, 0, player2_dir)
             if keys[pygame.K_RIGHT]:
                 move (player2, 1, 0, player2_dir)
-
-            last_move_time = current_time
+            last_move_p2 = current_time
 
     #gun usage conditions
         if gun_pos is not None:
@@ -525,6 +674,8 @@ while True:
         draw_map()
         draw_players()
         draw_gun()
+        update_powerups()
+        draw_powerups()
     
     btn_rects = None 
     
