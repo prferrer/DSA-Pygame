@@ -250,9 +250,9 @@ while True:
         if keys[pygame.K_LEFT]: player2.move(-1, 0, md.map_data, current_time, p2_delay)
         if keys[pygame.K_RIGHT]: player2.move(1, 0, md.map_data, current_time, p2_delay)
         
-        # Shoot via 'keys' state rather than isolated events to bypass ghosting drops
+        # Shoot via 'keys'
         if keys[pygame.K_SPACE]: shoot(gun, player1, bullets, current_time, md.map_data)
-        if keys[pygame.K_RETURN]: shoot(gun, player2, bullets, current_time, md.map_data)
+        if keys[pygame.K_RSHIFT]: shoot(gun, player2, bullets, current_time, md.map_data)
 
         if gun.pos:
             if player1.pos == gun.pos: gun.pickup(player1)
