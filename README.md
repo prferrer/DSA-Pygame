@@ -5,4 +5,4 @@ tempCodeRunnerFile.python
 
 Additional note:
 'snow.avif' - not yet implemented
-'coconut.jpg' - not yet implemented
+'coconut.jfif' - not yet implemented
