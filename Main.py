@@ -260,8 +260,8 @@ def draw_gun():
             screen,
             (255, 255, 0),
             (
-                gun_pos[0] * TILE_SIZE + TILE_SIZE//3,
-                gun_pos[1] * TILE_SIZE + TILE_SIZE//3,
+                offset_x + gun_pos[0] * TILE_SIZE + TILE_SIZE//3,
+                offset_y + gun_pos[1] * TILE_SIZE + TILE_SIZE//3,
                 gun_size,
                 gun_size
             )
@@ -269,30 +269,31 @@ def draw_gun():
 
     #user getting gun
     if gun_owner == "p1":
-        offset_x = player1_dir[0] * TILE_SIZE // 2
-        offset_y = player1_dir[1] * TILE_SIZE // 2
+        gun_ox = player1_dir[0] * TILE_SIZE // 2
+        gun_oy = player1_dir[1] * TILE_SIZE // 2
+        
 
         pygame.draw.rect(
             screen,
             (255, 255, 0),
             (
-                player1[0]*TILE_SIZE + offset_x + TILE_SIZE//3,
-                player1[1]*TILE_SIZE + offset_y + TILE_SIZE//3,
+                player1[0]*TILE_SIZE + gun_ox + TILE_SIZE//3,
+                player1[1]*TILE_SIZE + gun_oy + TILE_SIZE//3,
                 gun_size,
                 gun_size
             )
         )
 
     elif gun_owner == "p2":
-        offset_x = player2_dir[0] * TILE_SIZE // 2
-        offset_y = player2_dir[1] * TILE_SIZE // 2
+        gun_ox = player2_dir[0] * TILE_SIZE // 2
+        gun_oy = player2_dir[1] * TILE_SIZE // 2
 
         pygame.draw.rect(
             screen,
             (255, 255, 0),
             (
-                player2[0]*TILE_SIZE + offset_x + TILE_SIZE//3,
-                player2[1]*TILE_SIZE + offset_y + TILE_SIZE//3,
+                player2[0]*TILE_SIZE + gun_ox + TILE_SIZE//3,
+                player2[1]*TILE_SIZE + gun_oy + TILE_SIZE//3,
                 gun_size,
                 gun_size
             )
@@ -468,14 +469,14 @@ def draw_powerups():
     
     if green_powerup is not None:
         screen.blit(speedboost_image, (
-                offset_x + green_powerup[0] * TILE_SIZE,
-                offset_y+ green_powerup[1] * TILE_SIZE
+                offset_x + green_powerup[0] * TILE_SIZE + (TILE_SIZE - POWERUP_SIZE) // 2,
+                offset_y+ green_powerup[1] * TILE_SIZE + (TILE_SIZE - POWERUP_SIZE) // 2
             ))
         
     if blue_powerup is not None:
         screen.blit(slowdown_image, (
-                offset_x + blue_powerup[0] * TILE_SIZE,
-                offset_y+ blue_powerup[1] * TILE_SIZE
+                offset_x + blue_powerup[0] * TILE_SIZE + (TILE_SIZE - POWERUP_SIZE) // 2,
+                offset_y+ blue_powerup[1] * TILE_SIZE + (TILE_SIZE - POWERUP_SIZE) // 2
             ))
         
 def update_powerups():
@@ -572,6 +573,7 @@ def reset_game():
 heart_image = pygame.image.load ("hearts.png")
 heart_image = pygame.transform.scale(heart_image, (20, 20))
 
+POWERUP_SIZE = 48
 speedboost_image = pygame.image.load("speedboost.png")
 speedboost_image = pygame.transform.scale(speedboost_image, (TILE_SIZE, TILE_SIZE))
 
@@ -600,11 +602,12 @@ while True:
         #player shooting
         if game_state == "playing":
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_e:
                     if gun_owner == "p1" and gun_ammo > 0:
                         shoot(player1, player1_dir, "p1")
                         gun_ammo -= 1
-                    elif gun_owner == "p2" and gun_ammo > 0:
+                if event.key == pygame.K_RSHIFT: 
+                    if gun_owner == "p2" and gun_ammo > 0:
                         shoot(player2, player2_dir, "p2")
                         gun_ammo -= 1
 
@@ -635,7 +638,7 @@ while True:
         else:
             p2_delay = NORMAL_MOVE_DELAY
         
-        if current_time - last_move_p1 >= p1_delay:
+        if current_time - last_move_p1 >= p1_delay: 
             if keys[pygame.K_w]:
                 move (player1, 0, -1, player1_dir)
             if keys[pygame.K_s]:
