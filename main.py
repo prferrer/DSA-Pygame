@@ -10,6 +10,9 @@ from mechanics import update_bullets
 
 pygame.init()
 
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+WIDTH, HEIGHT = screen.get_size()
+
 global green_powerup, blue_powerup
 global green_spawn_time, blue_spawn_time
 global green_despawn_time, blue_despawn_time
@@ -69,11 +72,22 @@ def draw_held_gun(screen, gun, player, map_data_module):
         return
     img = GUN_TYPES[gun.type]["image"]
     dx, dy = player.dir
+    
+    if  (dx, dy) == (1, 0): rotated = img
+    elif (dx, dy) == (-1, 0): rotated = pygame.transform.flip(img, True, False)
+    elif (dx, dy) == (0, -1): rotated = pygame.transform.rotate(img, 90)
+    elif (dx, dy) == (0, 1): rotated = pygame.transform.rotate(img, 270)
+    else: rotated = img
+  
+    center_x = map_data_module.offset_x + player.pos[0] * map_data_module.TILE_SIZE
+    center_y = map_data_module.offset_y + player.pos[1] * map_data_module.TILE_SIZE
+    
     offset_x = dx * map_data_module.TILE_SIZE // 2
     offset_y = dy * map_data_module.TILE_SIZE // 2
-    x = map_data_module.offset_x + player.pos[0]*map_data_module.TILE_SIZE + offset_x
-    y = map_data_module.offset_y + player.pos[1]*map_data_module.TILE_SIZE + offset_y
-    screen.blit(img, (x, y))
+    
+    draw_x = center_x + offset_x + (map_data_module.TILE_SIZE - rotated.get_width()) // 2
+    draw_y = center_y + offset_y + (map_data_module.TILE_SIZE - rotated.get_height()) // 2
+    screen.blit(rotated, (draw_x, draw_y))
 
 def draw_weapon_ui(screen, gun, player, x, y):
     if gun.owner == player:
@@ -161,6 +175,7 @@ def draw_powerups(screen):
             screen.blit(scaled, (x, y))
         else:
             pygame.draw.circle(screen, (0,0,255), (x + md.map_data.TILE_SIZE//2, y + md.map_data.TILE_SIZE//2), md.map_data.TILE_SIZE//2)
+    
 
 def draw_bullets(screen, bullets):
     for b in bullets:
@@ -202,14 +217,6 @@ while True:
     md.map_data.offset_x = (WIDTH - (md.MAP_COLS * TILE_SIZE)) // 2
     md.map_data.offset_y = (HEIGHT - (md.MAP_ROWS * TILE_SIZE)) // 2
 
-    if game_state == "playing" and current_time - last_shrink_time >= SHRINK_INTERVAL:
-        last_shrink_time = current_time
-        md.shrink_map([player1, player2])
-        
-        if gun.pos and md.map_grid[gun.pos[1]][gun.pos[0]] == 1: gun.spawn(md.map_data)
-        if green_powerup and md.map_grid[green_powerup[1]][green_powerup[0]] == 1: green_powerup = None
-        if blue_powerup and md.map_grid[blue_powerup[1]][blue_powerup[0]] == 1: blue_powerup = None
-
     if game_state == "playing":
         if not green_powerup and current_time >= green_spawn_time:
             green_powerup = get_valid_powerup_spawn()
@@ -231,6 +238,27 @@ while True:
 
         time_elapsed = current_time - start_time
         time_left = max(0, GAME_DURATION - time_elapsed)
+        
+        if time_left <= 60000:
+            if last_shrink_time == start_time:
+                last_shrink_time = current_time 
+            
+            if current_time - last_shrink_time >= SHRINK_INTERVAL:
+                last_shrink_time = current_time
+                md.shrink_map([player1, player2])
+        
+                if gun.pos and md.map_grid[gun.pos[1]][gun.pos[0]] == 1:
+                    gun.pos = None
+                    gun.owner = None
+                    last_gun_spawn_time = current_time
+            
+                if green_powerup and md.map_grid[green_powerup[1]][green_powerup[0]] == 1: 
+                    green_powerup = None
+                    green_spawn_time = current_time + POWERUP_RESPAWN
+            
+                if blue_powerup and md.map_grid[blue_powerup[1]][blue_powerup[0]] == 1: 
+                    blue_powerup = None
+                    blue_spawn_time = current_time + POWERUP_RESPAWN
 
         p1_delay = NORMAL_MOVE_DELAY
         p2_delay = NORMAL_MOVE_DELAY
@@ -251,23 +279,50 @@ while True:
         if keys[pygame.K_RIGHT]: player2.move(1, 0, md.map_data, current_time, p2_delay)
         
         # Shoot via 'keys' state rather than isolated events to bypass ghosting drops
-        if keys[pygame.K_SPACE]: shoot(gun, player1, bullets, current_time, md.map_data)
+        if keys[pygame.K_e]: shoot(gun, player1, bullets, current_time, md.map_data)
         if keys[pygame.K_RSHIFT]: shoot(gun, player2, bullets, current_time, md.map_data)
 
         if gun.pos:
-            if player1.pos == gun.pos: gun.pickup(player1)
-            elif player2.pos == gun.pos: gun.pickup(player2)
+            if player1.pos == gun.pos: gun.pickup(player1, current_time)
+            elif player2.pos == gun.pos: gun.pickup(player2, current_time)
 
         if gun.owner and gun.ammo <= 0:
+            from guns import gun_last_used
+            gun_last_used[gun.type] = current_time
             gun.owner = None
             last_gun_spawn_time = current_time
+
+# Drop if duration expired
+        if gun.owner and gun.pickup_time and (current_time - gun.pickup_time >= gun.duration):
+            from guns import gun_last_used
+            gun_last_used[gun.type] = current_time
+            gun.owner = None
+            gun.pickup_time = None
+            last_gun_spawn_time = current_time
+
+# Respawn if no position and no owner
         if not gun.pos and not gun.owner:
             if current_time - last_gun_spawn_time >= GUN_RESPAWN_TIME:
-                gun.spawn(md.map_data)
+                spawned = gun.spawn(md.map_data, current_time)
+                if not spawned:
+                    last_gun_spawn_time = current_time
 
         hit_flag = update_bullets(bullets, [player1, player2], md.map_data, dt)
         if hit_flag:
-            reset_round()
+            if player1.hp <= 0:
+               player1.pos = md.get_valid_spawn(True)
+               player1.dir = [1,0]
+               player1.hp = 3
+            if player2.hp <= 0:
+                player2.pos = md.get_valid_spawn(False)
+                player2.dir = [-1, 0]
+                player2.hp = 3
+            bullets.clear()
+            
+            if gun.owner and gun.owner.hp == 3 and hit_flag:
+                gun.owner = None
+                gun.pickup_time = None
+                last_gun_spawn_time = current_time
 
         if not player1.is_alive: game_state, win_text = "win", "Player 2"
         elif not player2.is_alive: game_state, winner_text = "win", "Player 1"
@@ -280,15 +335,22 @@ while True:
         if green_powerup and player1.pos == green_powerup:
             speed_boost_p1 = current_time + SPEED_BOOST_DURATION
             green_powerup = None
+            green_spawn_time = current_time + POWERUP_RESPAWN 
+            
         if blue_powerup and player1.pos == blue_powerup:
             slow_p2 = current_time + SLOW_DURATION
             blue_powerup = None
+            blue_spawn_time = current_time + POWERUP_RESPAWN 
+            
         if green_powerup and player2.pos == green_powerup:
             speed_boost_p2 = current_time + SPEED_BOOST_DURATION
             green_powerup = None
+            green_spawn_time = current_time + POWERUP_RESPAWN 
+            
         if blue_powerup and player2.pos == blue_powerup:
             slow_p1 = current_time + SLOW_DURATION
             blue_powerup = None
+            blue_spawn_time = current_time + POWERUP_RESPAWN
 
     screen.fill((30, 30, 30))
 
