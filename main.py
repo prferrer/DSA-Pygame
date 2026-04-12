@@ -70,7 +70,7 @@ def draw_health_bar(screen, player, x, y):
 def draw_held_gun(screen, gun, player, map_data_module):
     if gun.owner != player:
         return
-    img = GUN_TYPES[gun.type]["image"]
+    img = GUN_TYPES[gun.type]["equipped_image"]
     dx, dy = player.dir
     
     if  (dx, dy) == (1, 0): rotated = img
@@ -279,7 +279,7 @@ while True:
         if keys[pygame.K_RIGHT]: player2.move(1, 0, md.map_data, current_time, p2_delay)
         
         # Shoot via 'keys' state rather than isolated events to bypass ghosting drops
-        if keys[pygame.K_e]: shoot(gun, player1, bullets, current_time, md.map_data)
+        if keys[pygame.K_f]: shoot(gun, player1, bullets, current_time, md.map_data)
         if keys[pygame.K_RSHIFT]: shoot(gun, player2, bullets, current_time, md.map_data)
 
         if gun.pos:
@@ -292,7 +292,7 @@ while True:
             gun.owner = None
             last_gun_spawn_time = current_time
 
-# Drop if duration expired
+        # Drop if duration expired
         if gun.owner and gun.pickup_time and (current_time - gun.pickup_time >= gun.duration):
             from guns import gun_last_used
             gun_last_used[gun.type] = current_time
@@ -300,24 +300,30 @@ while True:
             gun.pickup_time = None
             last_gun_spawn_time = current_time
 
-# Respawn if no position and no owner
+        # Respawn if no position and no owner
         if not gun.pos and not gun.owner:
             if current_time - last_gun_spawn_time >= GUN_RESPAWN_TIME:
                 spawned = gun.spawn(md.map_data, current_time)
                 if not spawned:
                     last_gun_spawn_time = current_time
 
-        hit_flag = update_bullets(bullets, [player1, player2], md.map_data, dt)
-        if hit_flag:
-            if player1.hp > 0:
-               player1.pos = md.get_valid_spawn(True)
-               player1.dir = [1,0]
-            if player2.hp > 0:
-                player2.pos = md.get_valid_spawn(False)
-                player2.dir = [-1, 0]
+       # Check if a player was hit
+        hit_player = update_bullets(bullets, [player1, player2], md.map_data, dt)
+        if hit_player:
+            # Only respawn the player who actually took the damage
+            if hit_player.hp > 0:
+                if hit_player == player1:
+                    player1.pos = md.get_valid_spawn(True)
+                    player1.dir = [1, 0]
+                elif hit_player == player2:
+                    player2.pos = md.get_valid_spawn(False) # False for player 2's spawn side
+                    player2.dir = [-1, 0]
+            
+            # Clear all bullets from the screen after a hit to reset the skirmish
             bullets.clear()
             
-            if gun.owner and gun.owner.hp == 3 and hit_flag:
+            # If the player who got hit was holding the gun, they drop it
+            if gun.owner == hit_player:
                 gun.owner = None
                 gun.pickup_time = None
                 last_gun_spawn_time = current_time
@@ -356,8 +362,10 @@ while True:
     draw_powerups(screen)
 
     if gun.pos:
-        img = GUN_TYPES[gun.type]["image"]
-        screen.blit(img, (md.map_data.offset_x + gun.pos[0] * TILE_SIZE, md.map_data.offset_y + gun.pos[1] * TILE_SIZE))
+        img = GUN_TYPES[gun.type]["map_image"]
+        draw_x = md.map_data.offset_x + gun.pos[0] * TILE_SIZE + (TILE_SIZE - img.get_width()) // 2
+        draw_y = md.map_data.offset_y + gun.pos[1] * TILE_SIZE + (TILE_SIZE - img.get_height()) // 2
+        screen.blit(img, (draw_x, draw_y))
 
     for player in [player1, player2]:
         pygame.draw.rect(screen, player.color,
