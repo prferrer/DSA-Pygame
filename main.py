@@ -281,7 +281,7 @@ while True:
         
         # Shoot via 'keys' state rather than isolated events to bypass ghosting drops
         if keys[pygame.K_f]: shoot(gun, player1, bullets, current_time, md.map_data)
-        if keys[pygame.K_RSHIFT]: shoot(gun, player2, bullets, current_time, md.map_data)
+        if keys[pygame.K_RCTRL]: shoot(gun, player2, bullets, current_time, md.map_data)
 
         if gun.pos:
             if player1.pos == gun.pos: gun.pickup(player1, current_time)
