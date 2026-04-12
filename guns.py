@@ -5,9 +5,9 @@ import map_data
 #slop ni clarence
 
 GUN_TYPES = {
-    "pistol": {"ammo": 8, "bullet_speed": 300, "cooldown": 400, "damage": 1, "range": 300, "duration": 15000, "path": "guns/assets/Glock18c-PxNBG.png", "map_scale": 0.8, "equip_scale": 0.5},
-    "rifle": {"ammo": 20, "bullet_speed": 500, "cooldown": 120, "damage": 1.5, "range": 600, "duration": 15000, "path": "guns/assets/M4A1-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4},
-    "shotgun": {"ammo": 5, "bullet_speed": 200, "cooldown": 800, "damage": 0.7, "spread": 8, "range": 150, "duration": 15000, "path": "guns/assets/Rem870-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4}
+    "pistol": {"ammo": 8, "bullet_speed": 300, "cooldown": 400, "damage": 1, "range": 300, "duration": 15000, "path": "assets/guns/Glock18c-PxNBG.png", "map_scale": 0.8, "equip_scale": 0.5},
+    "rifle": {"ammo": 20, "bullet_speed": 500, "cooldown": 120, "damage": 1.5, "range": 600, "duration": 15000, "path": "assets/guns/M4A1-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4},
+    "shotgun": {"ammo": 5, "bullet_speed": 200, "cooldown": 800, "damage": 0.7, "spread": 8, "range": 150, "duration": 15000, "path": "assets/guns/Rem870-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4}
 }
 
 GUN_COOLDOWNS = {
