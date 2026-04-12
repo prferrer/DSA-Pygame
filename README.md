@@ -1,4 +1,17 @@
+pre-alpha 2.1 120426
+Added/Fixed:
+Added coconut
 
+Task:
+more organised files (main is cluttered and some are not properly assigned to their designated file destination)
+modular external files (some functions must guarantee plug and play codes)
+player customization
+main menu
+more guns
+more maps
+
+
+=======================================================
 pre-alpha 2.0 120426
 Added/Fixed:
 make the guns image scale
