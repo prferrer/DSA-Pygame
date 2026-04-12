@@ -309,14 +309,12 @@ while True:
 
         hit_flag = update_bullets(bullets, [player1, player2], md.map_data, dt)
         if hit_flag:
-            if player1.hp <= 0:
+            if player1.hp > 0:
                player1.pos = md.get_valid_spawn(True)
                player1.dir = [1,0]
-               player1.hp = 3
-            if player2.hp <= 0:
+            if player2.hp > 0:
                 player2.pos = md.get_valid_spawn(False)
                 player2.dir = [-1, 0]
-                player2.hp = 3
             bullets.clear()
             
             if gun.owner and gun.owner.hp == 3 and hit_flag:
