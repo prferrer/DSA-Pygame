@@ -1,7 +1,7 @@
 import pygame
 
 def update_bullets(bullets, players, map_data_module, dt):
-    hit_occurred = False
+    hit_player = None  # Track the specific player that gets hit
     
     for b in bullets[:]:
         # Force float multiplication for smooth pixel movement
@@ -37,13 +37,13 @@ def update_bullets(bullets, players, map_data_module, dt):
                 )
                 if p_rect.collidepoint(b["x"], b["y"]):
                     p.hp -= b["damage"]
-                    hit_occurred = True
+                    hit_player = p  # Record who was hit
                     if b in bullets:
                         bullets.remove(b)
                     break
         
         # Stop processing other bullets this frame to avoid simultaneous damage bugs
-        if hit_occurred:
+        if hit_player:
             break
 
-    return hit_occurred
+    return hit_player  # Return the player object, or None if no one was hit
