@@ -45,22 +45,22 @@ game_state = "playing"
 winner_text = ""
 
 try:
-    HEART_IMG = pygame.image.load("hearts.png").convert_alpha()
+    HEART_IMG = pygame.image.load("assets/health/hearts.png").convert_alpha()
     HEART_IMG = pygame.transform.scale(HEART_IMG, (24, 24))
 except:
     HEART_IMG = pygame.Surface((24, 24), pygame.SRCALPHA)
     HEART_IMG.fill((255, 0, 0))
 
 try:
-    SPEED_IMG = pygame.image.load("speedboost.png").convert_alpha()
+    SPEED_IMG = pygame.image.load("assets/powerups/speedboost.png").convert_alpha()
 except:
     SPEED_IMG = None
 
 try:
-    SLOW_IMG = pygame.image.load("slowdown.png").convert_alpha() 
+    SLOW_IMG = pygame.image.load("assets/powerups/slowdown.png").convert_alpha() 
 except:
     SLOW_IMG = None
-
+    
 def draw_health_bar(screen, player, x, y):
     for i in range(int(player.hp)):
         screen.blit(HEART_IMG, (x + i*28, y))
