@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import os
 
 from config import *
 import map_data as md
@@ -175,7 +176,7 @@ def draw_powerups(screen):
             screen.blit(scaled, (x, y))
         else:
             pygame.draw.circle(screen, (0,0,255), (x + md.map_data.TILE_SIZE//2, y + md.map_data.TILE_SIZE//2), md.map_data.TILE_SIZE//2)
-    
+if not os.path.exists("assets/coconut/coconut.jfif"): sys.exit("Critical Error: Missing essential texture 'coconut.jfif'.")
 
 def draw_bullets(screen, bullets):
     for b in bullets:
