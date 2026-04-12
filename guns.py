@@ -5,9 +5,9 @@ import map_data
 #slop ni clarence
 
 GUN_TYPES = {
-    "pistol": {"ammo": 8, "bullet_speed": 300, "cooldown": 400, "damage": 1, "range": 300, "duration": 15000, "path": "guns/assets/Glock18c-PxNBG.png"},
-    "rifle": {"ammo": 20, "bullet_speed": 500, "cooldown": 120, "damage": 1.5, "range": 600, "duration": 15000, "path": "guns/assets/M4A1-Px-PxNBG.png"},
-    "shotgun": {"ammo": 5, "bullet_speed": 200, "cooldown": 800, "damage": 0.7, "spread": 8, "range": 150, "duration": 15000, "path": "guns/assets/Rem870-Px-PxNBG.png"}
+    "pistol": {"ammo": 8, "bullet_speed": 300, "cooldown": 400, "damage": 1, "range": 300, "duration": 15000, "path": "guns/assets/Glock18c-PxNBG.png", "map_scale": 0.8, "equip_scale": 0.5},
+    "rifle": {"ammo": 20, "bullet_speed": 500, "cooldown": 120, "damage": 1.5, "range": 600, "duration": 15000, "path": "guns/assets/M4A1-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4},
+    "shotgun": {"ammo": 5, "bullet_speed": 200, "cooldown": 800, "damage": 0.7, "spread": 8, "range": 150, "duration": 15000, "path": "guns/assets/Rem870-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4}
 }
 
 GUN_COOLDOWNS = {
@@ -21,10 +21,29 @@ def scale_gun_images(tile_size):
     for gun in GUN_TYPES.values():
         try:
             img = pygame.image.load(gun["path"]).convert_alpha()
-            gun["image"] = pygame.transform.scale(img, (tile_size, tile_size))
+            # Calculate aspect ratio to prevent squishing
+            aspect_ratio = img.get_width() / img.get_height()
+            
+            # Base the height on the tile_size, and scale the width to match
+            base_height = tile_size
+            base_width = int(tile_size * aspect_ratio)
+
+            # Create the Map version
+            map_w = int(base_width * gun.get("map_scale", 1.0))
+            map_h = int(base_height * gun.get("map_scale", 1.0))
+            gun["map_image"] = pygame.transform.scale(img, (map_w, map_h))
+
+            # Create the Equipped version
+            equip_w = int(base_width * gun.get("equip_scale", 1.0))
+            equip_h = int(base_height * gun.get("equip_scale", 1.0))
+            gun["equipped_image"] = pygame.transform.scale(img, (equip_w, equip_h))
+
         except (FileNotFoundError, pygame.error):
-            gun["image"] = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
-            gun["image"].fill((100, 100, 100))
+            # Fallback surfaces if images are missing
+            gun["map_image"] = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
+            gun["map_image"].fill((100, 100, 100))
+            gun["equipped_image"] = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
+            gun["equipped_image"].fill((100, 100, 100))
 
 class GunSystem:
     def __init__(self):
