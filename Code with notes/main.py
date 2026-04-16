@@ -14,6 +14,7 @@ pygame.init()
 screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 WIDTH, HEIGHT = screen.get_size()
 
+#Par of powerup flowchart
 global green_powerup, blue_powerup
 global green_spawn_time, blue_spawn_time
 global green_despawn_time, blue_despawn_time
@@ -24,12 +25,14 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("PacPew - 2D Arena Shooter")
 clock = pygame.time.Clock()
 
+#part of guns flowchart
 scale_gun_images(md.map_data.TILE_SIZE)
 
 HUD_FONT = pygame.font.SysFont(None, 36)
 BIG_FONT = pygame.font.SysFont(None, 72)
 MED_FONT = pygame.font.SysFont(None, 40)
 
+#part of players flowchart
 player1 = Player(2, 2, BLUE)
 player2 = Player(45, 24, RED)
 
@@ -37,6 +40,7 @@ gun = GunSystem()
 gun.spawn(md.map_data)
 bullets = []
 
+#part of guns flowchart
 GUN_RESPAWN_TIME = 5000
 last_gun_spawn_time = pygame.time.get_ticks()
 start_time = pygame.time.get_ticks()
@@ -62,6 +66,7 @@ try:
 except:
     SLOW_IMG = None
 
+#part of players flowchart --- until draw weapon ui
 def draw_health_bar(screen, player, x, y):
     for i in range(int(player.hp)):
         screen.blit(HEART_IMG, (x + i*28, y))
@@ -90,6 +95,7 @@ def draw_held_gun(screen, gun, player, map_data_module):
     draw_y = center_y + offset_y + (map_data_module.TILE_SIZE - rotated.get_height()) // 2
     screen.blit(rotated, (draw_x, draw_y))
 
+#part of player flowchart pa rin
 def draw_weapon_ui(screen, gun, player, x, y):
     if gun.owner == player:
         text = f"{gun.type.upper()} | Ammo: {gun.ammo}"
@@ -137,7 +143,7 @@ def reset_game():
     winner_text = ""
 
 #================= POWERUP LOGIC STATS =================}
-
+#part of powerup flowchart
 green_powerup = None
 blue_powerup = None
 green_spawn_time = pygame.time.get_ticks() + random.randint(5000, 15000)
@@ -154,7 +160,7 @@ SPEED_BOOST_DURATION = 2000
 SLOW_DURATION = 2000
 
 #================= POWERUP LOGIC SPAWN ALGO =================}
-
+#part of powerup flowchart
 # Function to find an empty floor tile for a powerup to spawn on
 def get_valid_powerup_spawn():
     # Start an infinite loop to guess random map coordinates
@@ -169,10 +175,7 @@ def get_valid_powerup_spawn():
             # Immediately return these valid coordinates as a list [x, y]
             return [x, y]
 
-
-
-
-
+#part of powerup flowchart
 def draw_powerups(screen):
     if green_powerup:
         x = md.map_data.offset_x + green_powerup[0]*md.map_data.TILE_SIZE
@@ -193,6 +196,7 @@ def draw_powerups(screen):
             pygame.draw.circle(screen, (0,0,255), (x + md.map_data.TILE_SIZE//2, y + md.map_data.TILE_SIZE//2), md.map_data.TILE_SIZE//2)
 if not os.path.exists("assets/coconut/coconut.jfif"): sys.exit("Critical Error: Missing essential texture 'coconut.jfif'.")
 
+#part of guns flowchart
 def draw_bullets(screen, bullets):
     for b in bullets:
         # Drawing slightly larger 8x8 bullets so they are clearly visible
@@ -234,7 +238,7 @@ while True:
     md.map_data.offset_y = (HEIGHT - (md.MAP_ROWS * TILE_SIZE)) // 2
 
 #================= POWERUP LOGIC TIMER=================}
-
+#part of powerup flowchart
 # Only process powerup timers if the game is actively running (not in the win screen)
     if game_state == "playing":
         
@@ -270,7 +274,7 @@ while True:
 
 
 
-
+    #part of powerup flowchart
     time_left = 0
     if game_state == "playing":
         keys = pygame.key.get_pressed()
@@ -301,12 +305,14 @@ while True:
 
         p1_delay = NORMAL_MOVE_DELAY
         p2_delay = NORMAL_MOVE_DELAY
-
+        #part of powerup flowchart 
         if speed_boost_p1 and current_time < speed_boost_p1: p1_delay = FAST_MOVE_DELAY
         if slow_p1 and current_time < slow_p1: p1_delay = SLOW_MOVE_DELAY
         if speed_boost_p2 and current_time < speed_boost_p2: p2_delay = FAST_MOVE_DELAY
         if slow_p2 and current_time < slow_p2: p2_delay = SLOW_MOVE_DELAY
+         #part of powerup flowchart until here
 
+        #part of player flowchart 
         if keys[pygame.K_w]: player1.move(0, -1, md.map_data, current_time, p1_delay)
         if keys[pygame.K_s]: player1.move(0, 1, md.map_data, current_time, p1_delay)
         if keys[pygame.K_a]: player1.move(-1, 0, md.map_data, current_time, p1_delay)
@@ -394,6 +400,8 @@ while True:
             slow_p1 = current_time + SLOW_DURATION
             blue_powerup = None
             blue_spawn_time = current_time + POWERUP_RESPAWN
+        # #part of plaer flowchart until here
+
 
     screen.fill((30, 30, 30))
 
