@@ -102,14 +102,12 @@ class MapData:
             for col in range(MAP_COLS):
                 # Out-of-bounds walls logic: Dark grey for shrunk map tiles
                 if map_grid[row][col] == 1:
-                    color = (80, 80, 80) if (col < shrink_layer or col >= MAP_COLS - shrink_layer or row < shrink_layer or row >= MAP_ROWS - shrink_layer) else (173, 216, 230)
-                else:
-                    color = (0, 0, 0)
-
-                pygame.draw.rect(screen, color, (
-                    self.offset_x + col * self.TILE_SIZE,
-                    self.offset_y + row * self.TILE_SIZE,
-                    self.TILE_SIZE, self.TILE_SIZE
-                ))
+                    # Only draw the wall if it is part of the shrinking zone
+                    if (col < shrink_layer or col >= MAP_COLS - shrink_layer or row < shrink_layer or row >= MAP_ROWS - shrink_layer):
+                        pygame.draw.rect(screen, (80, 80, 80), (
+                            self.offset_x + col * self.TILE_SIZE,
+                            self.offset_y + row * self.TILE_SIZE,
+                            self.TILE_SIZE, self.TILE_SIZE
+                        ))
 
 map_data = MapData()
