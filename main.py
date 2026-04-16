@@ -3,6 +3,7 @@ import sys
 import random
 import os
 
+from menu import run_menu
 from config import *
 import map_data as md
 from players import Player
@@ -24,14 +25,21 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("PacPew - 2D Arena Shooter")
 clock = pygame.time.Clock()
 
+menu_data = run_menu(screen)
+
 scale_gun_images(md.map_data.TILE_SIZE)
 
 HUD_FONT = pygame.font.SysFont(None, 36)
 BIG_FONT = pygame.font.SysFont(None, 72)
 MED_FONT = pygame.font.SysFont(None, 40)
 
-player1 = Player(2, 2, BLUE)
-player2 = Player(45, 24, RED)
+p1_spawn = md.get_valid_spawn(True)
+p2_spawn = md.get_valid_spawn(False)
+
+player1 = Player(p1_spawn[0], p1_spawn[1], menu_data["p1_color"])
+player2 = Player(p2_spawn[0], p2_spawn[1], menu_data["p2_color"])
+
+selected_map_name = menu_data["map_name"]
 
 gun = GunSystem()
 gun.spawn(md.map_data)
@@ -329,7 +337,7 @@ while True:
                 gun.pickup_time = None
                 last_gun_spawn_time = current_time
 
-        if not player1.is_alive: game_state, win_text = "win", "Player 2"
+        if not player1.is_alive: game_state, winner_text = "win", "Player 2"
         elif not player2.is_alive: game_state, winner_text = "win", "Player 1"
         elif time_left == 0:
             game_state = "win"
@@ -386,6 +394,9 @@ while True:
     if game_state == "playing":
         timer_text = HUD_FONT.render(f"Time: {time_left // 1000}", True, (255, 255, 255))
         screen.blit(timer_text, (WIDTH // 2 - timer_text.get_width() // 2, 10))
+
+        map_text = HUD_FONT.render(f"Map: {selected_map_name}", True, (255, 255, 255))
+        screen.blit(map_text, (WIDTH // 2 - map_text.get_width() // 2, 45))
 
     if game_state == "win":
         draw_win_screen(screen, winner_text)
