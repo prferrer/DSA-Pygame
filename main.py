@@ -69,6 +69,14 @@ try:
     SLOW_IMG = pygame.image.load("assets/powerups/slowdown.png").convert_alpha() 
 except:
     SLOW_IMG = None
+
+try:
+    BACKGROUND_IMG = pygame.image.load("Map3.png").convert()
+except:
+    BACKGROUND_IMG = None
+
+scaled_bg = None
+current_bg_size = (0, 0)
     
 def draw_health_bar(screen, player, x, y):
     for i in range(int(player.hp)):
@@ -332,7 +340,7 @@ while True:
             bullets.clear()
             
             # If the player who got hit was holding the gun, they drop it
-            if gun.owner == hit_player:
+            if gun.owner:
                 gun.owner = None
                 gun.pickup_time = None
                 last_gun_spawn_time = current_time
@@ -366,6 +374,23 @@ while True:
             blue_spawn_time = current_time + POWERUP_RESPAWN
 
     screen.fill((30, 30, 30))
+
+    # --- Draw the Background Image ---
+    if BACKGROUND_IMG:
+        map_w = md.MAP_COLS * TILE_SIZE
+        map_h = md.MAP_ROWS * TILE_SIZE
+        
+        # Only rescale the image if the window size/tile size has changed
+        if current_bg_size != (map_w, map_h):
+            scaled_bg = pygame.transform.scale(BACKGROUND_IMG, (map_w, map_h))
+            current_bg_size = (map_w, map_h)
+            
+        # Draw the background exactly where the map grid starts
+        screen.blit(scaled_bg, (md.map_data.offset_x, md.map_data.offset_y))
+
+    # Draw the shrinking map layers over the background
+    md.map_data.draw_map(screen)
+    draw_powerups(screen)
 
     md.map_data.draw_map(screen)
     draw_powerups(screen)
