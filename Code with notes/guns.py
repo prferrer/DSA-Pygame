@@ -77,54 +77,39 @@ class GunSystem:
 
 ##================= GUN SPAWN ALGO =================}
 
-# The method takes 'map_data_module' to read the grid layout and 'current_time' to calculate cooldowns.
-def spawn(self, map_data_module, current_time=0):
-    
-    # 1. DETERMINE ELIGIBLE GUNS
-    # This is a Python list comprehension. It iterates through every gun type defined in the GUN_TYPES dictionary.
-    # It checks the global 'gun_last_used' timestamp against the 'current_time'.
-    # If the time passed is greater than or equal to the gun's mandatory cooldown, it gets added to the 'available' list.
-    available = [
-        t for t in GUN_TYPES
-        if current_time - gun_last_used[t] >= GUN_COOLDOWNS[t]
-    ]
-    
-    # 2. ABORT IF ALL ON COOLDOWN
-    # If the 'available' list is completely empty, it means no guns are ready to spawn yet.
-    # We return False to exit the function early and avoid errors.
-    if not available:
-        return False
-    
-    # 3. START COORDINATE SEARCH
-    # We open a 'while True' loop. This creates an infinite loop that will keep guessing 
-    # locations until it finds a valid spot, at which point we will force it to 'break'.
-    while True:
+# Method signature: takes map_data to check the grid, and current_time to check cooldowns
+    def spawn(self, map_data_module, current_time=0):
         
-        # 4. GUESS RANDOM X & Y
-        # We use Python's random module to pick an X (column) index. 
-        # It guesses a number from 0 up to the maximum number of columns on the map (minus 1 for zero-indexing).
-        x = random.randint(0, map_data_module.MAP_COLS - 1)
-        # We do the exact same thing to guess a Y (row) index.
-        y = random.randint(0, map_data_module.MAP_ROWS - 1)
+        # Use a list comprehension to create a list of gun types (pistol, rifle, shotgun) 
+        # that are currently allowed to spawn. It checks if the time since the gun was last used/dropped 
+        # is greater than or equal to its mandatory respawn cooldown.
+        available = [
+            t for t in GUN_TYPES
+            if current_time - gun_last_used[t] >= GUN_COOLDOWNS[t]
+        ]
         
-        # 5. CHECK GRID FOR EMPTY SPACE
-        # We look up the guessed [y][x] coordinates in the map's 2D array ('map_grid').
-        # If the integer at that location is '0', it represents a blank floor tile (meaning no walls).
-        if map_data_module.map_grid[y][x] == 0:
+        # If the 'available' list is empty (all guns are still on cooldown), return False to abort the spawn
+        if not available:
+            return False
+        
+        # Start an infinite loop to continually guess random coordinates until an empty tile is found
+        while True:
+            # Pick a random column index (X) anywhere between 0 and the maximum width of the map
+            x = random.randint(0, map_data_module.MAP_COLS - 1)
+            # Pick a random row index (Y) anywhere between 0 and the maximum height of the map
+            y = random.randint(0, map_data_module.MAP_ROWS - 1)
             
-            # 6. SET GUN POSITION
-            # Because we confirmed the tile is empty, we update this gun object's internal position to these coordinates.
-            self.pos = [x, y]
-            
-            # 7. ASSIGN RANDOM GUN TYPE
-            # We use 'random.choice' to randomly pull one of the eligible gun types from the 'available' list 
-            # we generated at the very beginning of the function.
-            self.type = random.choice(available)
-            
-            # 8. STOP SEARCHING
-            # We have successfully found a valid tile and assigned the gun data. 
-            # We trigger 'break' to immediately kill the infinite 'while True' loop.
-            break
+            # Check the map grid at the guessed Y and X coordinates. 
+            # A value of 0 means the tile is an empty floor (safe to spawn).
+            if map_data_module.map_grid[y][x] == 0:
+                # Update the gun object's internal position list to these valid coordinates
+                self.pos = [x, y]
+                # Randomly pick which type of gun (from the available list) this will be
+                self.type = random.choice(available)
+                # Break the infinite loop because we successfully placed the gun
+                break
+
+
 
 
 ##================= GUN PICKUP LOGIC =================}
