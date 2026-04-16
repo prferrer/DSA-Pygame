@@ -233,7 +233,9 @@ while True:
     md.map_data.TILE_SIZE = TILE_SIZE
     md.map_data.offset_x = (WIDTH - (md.MAP_COLS * TILE_SIZE)) // 2
     md.map_data.offset_y = (HEIGHT - (md.MAP_ROWS * TILE_SIZE)) // 2
-
+    if not os.path.exists("assets/coconut/coconut.jfif"): 
+            sys.exit("Critical Error: Missing essential texture 'health.png'.")
+        
     if game_state == "playing":
         if not green_powerup and current_time >= green_spawn_time:
             green_powerup = get_valid_powerup_spawn()
