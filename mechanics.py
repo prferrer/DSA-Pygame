@@ -3,6 +3,7 @@ import pygame
 def update_bullets(bullets, players, map_data_module, dt):
     """
     Move every bullet, check wall and player collisions.
+    Handle explosive bullets (rockets) with area damage.
 
     Returns a tuple  (hit_player, armor_absorbed)
       hit_player    – the Player instance that was hit, or None
@@ -19,6 +20,11 @@ def update_bullets(bullets, players, map_data_module, dt):
 
         # ── Range check ───────────────────────────────────────────────
         if b["distance_traveled"] >= b["max_range"]:
+            # If explosive, trigger explosion at max range
+            if b.get("is_explosive", False):
+                hit_player, armor_absorbed = handle_explosion(
+                    b, players, map_data_module, hit_player, armor_absorbed
+                )
             if b in bullets:
                 bullets.remove(b)
             continue
@@ -32,6 +38,11 @@ def update_bullets(bullets, players, map_data_module, dt):
             and 0 <= grid_x < len(map_data_module.map_grid[0])
         ):
             if map_data_module.map_grid[grid_y][grid_x] == 1:
+                # If explosive, trigger explosion at wall
+                if b.get("is_explosive", False):
+                    hit_player, armor_absorbed = handle_explosion(
+                        b, players, map_data_module, hit_player, armor_absorbed
+                    )
                 if b in bullets:
                     bullets.remove(b)
                 continue
@@ -55,23 +66,73 @@ def update_bullets(bullets, players, map_data_module, dt):
             )
 
             if bullet_rect.colliderect(player_rect):
-                # ── Armor absorbs the hit ──────────────────────────
-                if p.armor > 0:
-                    p.armor        -= 1
-                    armor_absorbed  = True
-                    # bullet is consumed but the player keeps their position
+                # If explosive, handle explosion damage
+                if b.get("is_explosive", False):
+                    hit_player, armor_absorbed = handle_explosion(
+                        b, players, map_data_module, hit_player, armor_absorbed
+                    )
                 else:
-                    p.hp -= 1
-                    if p.hp < 0:
-                        p.hp = 0
-                    armor_absorbed = False
+                    # Regular bullet hit
+                    # ── Armor absorbs the hit ──────────────────────────
+                    if p.armor > 0:
+                        p.armor        -= 1
+                        armor_absorbed  = True
+                        # bullet is consumed but the player keeps their position
+                    else:
+                        p.hp -= 1
+                        if p.hp < 0:
+                            p.hp = 0
+                        armor_absorbed = False
 
-                hit_player = p
+                    hit_player = p
 
                 if b in bullets:
                     bullets.remove(b)
                 break
 
+    return hit_player, armor_absorbed
+
+
+def handle_explosion(bullet, players, map_data_module, current_hit_player, current_armor_absorbed):
+    """
+    Handle explosion damage for rocket launcher.
+    Damages all players within explosion_radius tiles of the impact point.
+    
+    Returns updated (hit_player, armor_absorbed) tuple.
+    """
+    explosion_radius = bullet.get("explosion_radius", 0)
+    if explosion_radius <= 0:
+        return current_hit_player, current_armor_absorbed
+    
+    # Convert bullet position to tile coordinates
+    impact_tile_x = (bullet["x"] - map_data_module.offset_x) / map_data_module.TILE_SIZE
+    impact_tile_y = (bullet["y"] - map_data_module.offset_y) / map_data_module.TILE_SIZE
+    
+    hit_player = current_hit_player
+    armor_absorbed = current_armor_absorbed
+    
+    for p in players:
+        if p == bullet["owner"]:
+            continue
+        
+        # Calculate distance in tiles
+        dx = p.pos[0] - impact_tile_x
+        dy = p.pos[1] - impact_tile_y
+        distance = (dx * dx + dy * dy) ** 0.5
+        
+        if distance <= explosion_radius:
+            # Apply damage
+            if p.armor > 0:
+                p.armor -= 1
+                armor_absorbed = True
+            else:
+                p.hp -= 1
+                if p.hp < 0:
+                    p.hp = 0
+                armor_absorbed = False
+            
+            hit_player = p
+    
     return hit_player, armor_absorbed
 
 
