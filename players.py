@@ -2,7 +2,7 @@ class Player:
     def __init__(self, x, y, color):
         self.pos      = [x, y]
         self.dir      = [1, 0]
-        self.hp       = 3
+        self.hp       = 100
         self.armor    = 0          # extra absorb-layers before losing a heart
         self.color    = color
         self.last_move = 0
