@@ -29,6 +29,8 @@ if menu_result is None:
 
 p1_name, p1_color, p1_hat, p2_name, p2_color, p2_hat, selected_map_name = menu_result
 
+md.init_map(selected_map_name)
+
 scale_gun_images(md.map_data.TILE_SIZE)
 
 HUD_FONT = pygame.font.SysFont(None, 36)
@@ -185,19 +187,16 @@ recalculate_layout()
 
 def draw_health_bar(surface, player, x, y):
     """
-    Total heart slots = player.hp (int) + player.armor.
-    The rightmost `armor` slots are drawn as ArHeart (armor replaces a heart).
-    The leftmost slots are drawn as normal hearts.
-    This way the HUD count never grows — armor visually swaps out a heart.
+    Always draws exactly 3 heart slots.
+    The rightmost `armor` slots show ArHeart; the rest show normal hearts.
+    When armor is lost it instantly reverts to a normal heart.
     """
-    total_slots = int(player.hp) + player.armor
-    for i in range(total_slots):
-        # Slots from the right are armored
-        is_armor = i >= int(player.hp)
+    TOTAL_HEARTS = 3
+    for i in range(TOTAL_HEARTS):
+        # Armor occupies the rightmost slots
+        is_armor = i >= (TOTAL_HEARTS - player.armor)
         img = AR_HEART_IMG if is_armor else HEART_IMG
         surface.blit(img, (x + i * 28, y))
-    hp_text = HUD_FONT.render(f"{player.hp:.1f}", True, (255, 255, 255))
-    surface.blit(hp_text, (x + total_slots * 28 + 5, y))
 
 
 def draw_held_gun(surface, gun, player, map_data_module):
@@ -272,18 +271,29 @@ def draw_armor_pickup(surface):
 
 
 def draw_melee_animations(surface, current_time):
-    """Step through Hit1–Hit5 proportionally over the animation duration."""
+    """
+    Draw each frame offset from the attacker's current facing direction.
+    This keeps the animation glued to the player as they move.
+    """
     for anim in active_animations[:]:
         elapsed  = current_time - anim["start"]
         progress = elapsed / anim["duration"]
         if progress >= 1.0:
             active_animations.remove(anim)
             continue
+
+        attacker  = anim["attacker"]
+        ts        = md.map_data.TILE_SIZE
         frame_idx = min(int(progress * len(MELEE_FRAMES)), len(MELEE_FRAMES) - 1)
         frame     = MELEE_FRAMES[frame_idx]
-        ts        = md.map_data.TILE_SIZE
         scaled    = pygame.transform.scale(frame, (ts, ts))
-        surface.blit(scaled, (anim["cx"] - ts // 2, anim["cy"] - ts // 2))
+
+        # Always recompute from the attacker's live position + facing direction
+        draw_x = (md.map_data.offset_x
+                  + (attacker.pos[0] + attacker.dir[0]) * ts)
+        draw_y = (md.map_data.offset_y
+                  + (attacker.pos[1] + attacker.dir[1]) * ts)
+        surface.blit(scaled, (draw_x, draw_y))
 
 
 def draw_bullets(surface, bullets):
@@ -304,7 +314,7 @@ def draw_player_hat(surface, player, hat_name):
     scaled = pygame.transform.smoothscale(hat_img, (hat_w, hat_h))
     px = md.map_data.offset_x + player.pos[0] * ts
     py = md.map_data.offset_y + player.pos[1] * ts
-    surface.blit(scaled, (px + (ts - hat_w) // 2, py - int(hat_h * 0.45)))
+    surface.blit(scaled, (px + (ts - hat_w) // 2, py - int(hat_h * 0.80)))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -493,30 +503,26 @@ while True:
         if p1_action_pressed and not p1_has_gun:
             if current_time - player1.last_melee >= MELEE_COOLDOWN:
                 player1.last_melee = current_time
-                # Compute the pixel centre of the tile directly in front of P1
+                active_animations.append({
+                    "attacker": player1,
+                    "start":    current_time,
+                    "duration": MELEE_ANIM_DURATION,
+                })
                 swing_tx = player1.pos[0] + player1.dir[0]
                 swing_ty = player1.pos[1] + player1.dir[1]
-                anim_cx  = md.map_data.offset_x + swing_tx * TILE_SIZE + TILE_SIZE // 2
-                anim_cy  = md.map_data.offset_y + swing_ty * TILE_SIZE + TILE_SIZE // 2
-                active_animations.append({
-                    "cx": anim_cx, "cy": anim_cy,
-                    "start": current_time, "duration": MELEE_ANIM_DURATION,
-                })
-                # Stun only if opponent is on that exact tile
                 if [swing_tx, swing_ty] == player2.pos:
                     player2.stunned_until = current_time + MELEE_STUN_DURATION
 
         if p2_action_pressed and not p2_has_gun:
             if current_time - player2.last_melee >= MELEE_COOLDOWN:
                 player2.last_melee = current_time
+                active_animations.append({
+                    "attacker": player2,
+                    "start":    current_time,
+                    "duration": MELEE_ANIM_DURATION,
+                })
                 swing_tx = player2.pos[0] + player2.dir[0]
                 swing_ty = player2.pos[1] + player2.dir[1]
-                anim_cx  = md.map_data.offset_x + swing_tx * TILE_SIZE + TILE_SIZE // 2
-                anim_cy  = md.map_data.offset_y + swing_ty * TILE_SIZE + TILE_SIZE // 2
-                active_animations.append({
-                    "cx": anim_cx, "cy": anim_cy,
-                    "start": current_time, "duration": MELEE_ANIM_DURATION,
-                })
                 if [swing_tx, swing_ty] == player1.pos:
                     player1.stunned_until = current_time + MELEE_STUN_DURATION
 
@@ -659,6 +665,7 @@ while True:
             screen.blit(img, (draw_x, draw_y))
 
     # Players
+    # Players
     for player in (player1, player2):
         px = md.map_data.offset_x + player.pos[0] * TILE_SIZE
         py = md.map_data.offset_y + player.pos[1] * TILE_SIZE
@@ -666,6 +673,16 @@ while True:
         # Flashing white border when stunned
         if current_time < player.stunned_until and (current_time // 120) % 2 == 0:
             pygame.draw.rect(screen, (255, 255, 255), (px, py, TILE_SIZE, TILE_SIZE), 3)
+
+        # Eyes — two white circles with black pupils, centered on the tile
+        eye_r      = max(2, TILE_SIZE // 8)       # white circle radius
+        pupil_r    = max(1, eye_r // 2)            # black pupil radius
+        eye_y      = py + TILE_SIZE // 2 - eye_r // 2
+        left_eye_x  = px + TILE_SIZE // 3
+        right_eye_x = px + (TILE_SIZE * 2) // 3
+        for ex in (left_eye_x, right_eye_x):
+            pygame.draw.circle(screen, (255, 255, 255), (ex, eye_y), eye_r)
+            pygame.draw.circle(screen, (0,   0,   0),   (ex, eye_y), pupil_r)
 
     draw_player_hat(screen, player1, p1_hat)
     draw_player_hat(screen, player2, p2_hat)

@@ -26,6 +26,6 @@ MELEE_RANGE         = 1      # tiles — must be directly adjacent in facing dir
 MELEE_ANIM_DURATION = 400    # ms for the hit-spark animation to play
 
 # ── Armor ─────────────────────────────────────
-ARMOR_RESPAWN_TIME  = 8000   # ms between armor pickups appearing
+ARMOR_RESPAWN_TIME  = 5000   # ms between armor pickups appearing
 ARMOR_DESPAWN_TIME  = 12000  # ms an armor pickup stays on the map before vanishing
-ARMOR_MAX_STACK     = 2      # maximum armor points a player can carry
+ARMOR_MAX_STACK     = 3      # maximum armor points a player can carry
