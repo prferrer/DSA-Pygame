@@ -1,4 +1,6 @@
 import pygame
+from guns import GUN_TYPES
+
 
 def update_bullets(bullets, players, map_data_module, dt):
     """
@@ -66,6 +68,9 @@ def update_bullets(bullets, players, map_data_module, dt):
             )
 
             if bullet_rect.colliderect(player_rect):
+                # Determine how much damage this specific bullet does
+                # We use .get() as a safety measure in case 'damage' isn't defined
+                bullet_damage = b.get("damage", 1) 
                 # If explosive, handle explosion damage
                 if b.get("is_explosive", False):
                     hit_player, armor_absorbed = handle_explosion(
@@ -73,13 +78,22 @@ def update_bullets(bullets, players, map_data_module, dt):
                     )
                 else:
                     # Regular bullet hit
-                    # ── Armor absorbs the hit ──────────────────────────
+                    # ── Armor Logic ──────────────────────────────────────────
                     if p.armor > 0:
-                        p.armor        -= 1
-                        armor_absorbed  = True
-                        # bullet is consumed but the player keeps their position
+                        # Armor absorbs damage first
+                        p.armor -= bullet_damage
+                        if p.armor <= 0:
+                            # Armor broken, overflow damage goes to HP
+                            p.hp += p.armor  # p.armor is negative here, so this reduces HP
+                            p.armor = 0
+                            if p.hp < 0:
+                                p.hp = 0
+                            armor_absorbed = False  # Armor broke, player respawns
+                        else:
+                            armor_absorbed = True  # Armor absorbed the hit
                     else:
-                        p.hp -= 1
+                        # No armor: reduce HP by the weapon's specific damage value
+                        p.hp -= bullet_damage
                         if p.hp < 0:
                             p.hp = 0
                         armor_absorbed = False
@@ -119,14 +133,26 @@ def handle_explosion(bullet, players, map_data_module, current_hit_player, curre
         dx = p.pos[0] - impact_tile_x
         dy = p.pos[1] - impact_tile_y
         distance = (dx * dx + dy * dy) ** 0.5
-        
+
+        boomer_damage = bullet.get("damage", 50)
+
         if distance <= explosion_radius:
-            # Apply damage
+            # Apply explosion damage
             if p.armor > 0:
-                p.armor -= 1
-                armor_absorbed = True
+                # Armor absorbs damage first
+                p.armor -= boomer_damage
+                if p.armor <= 0:
+                    # Armor broken, overflow damage goes to HP
+                    p.hp += p.armor  # p.armor is negative here, so this reduces HP
+                    p.armor = 0
+                    if p.hp < 0:
+                        p.hp = 0
+                    armor_absorbed = False  # Armor broke, player respawns
+                else:
+                    armor_absorbed = True  # Armor absorbed the hit
             else:
-                p.hp -= 1
+                # No armor: reduce HP by explosion damage
+                p.hp -= boomer_damage
                 if p.hp < 0:
                     p.hp = 0
                 armor_absorbed = False
