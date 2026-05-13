@@ -28,6 +28,7 @@ if menu_result is None:
     sys.exit()
 
 p1_name, p1_color, p1_hat, p2_name, p2_color, p2_hat, selected_map_name = menu_result
+md.set_map(selected_map_name)
 
 scale_gun_images(md.map_data.TILE_SIZE)
 
@@ -183,21 +184,33 @@ recalculate_layout()
 # DRAWING HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def draw_health_bar(surface, player, x, y):
+def draw_health_bar(surface, player, x, y, bar_width=200, bar_height=20):
     """
-    Total heart slots = player.hp (int) + player.armor.
-    The rightmost `armor` slots are drawn as ArHeart (armor replaces a heart).
-    The leftmost slots are drawn as normal hearts.
-    This way the HUD count never grows — armor visually swaps out a heart.
+    Renders a linear health bar. 
+    Green represents HP, and a secondary color (like Blue or Silver) represents Armor.
     """
-    total_slots = int(player.hp) + player.armor
-    for i in range(total_slots):
-        # Slots from the right are armored
-        is_armor = i >= int(player.hp)
-        img = AR_HEART_IMG if is_armor else HEART_IMG
-        surface.blit(img, (x + i * 28, y))
-    hp_text = HUD_FONT.render(f"{player.hp:.1f}", True, (255, 255, 255))
-    surface.blit(hp_text, (x + total_slots * 28 + 5, y))
+    # Constants for health
+    MAX_HP = 100
+    health_ratio = max(0, player.hp / MAX_HP)
+    
+    # 1. Draw Background (Empty Bar)
+    bg_rect = pygame.Rect(x, y, bar_width, bar_height)
+    pygame.draw.rect(surface, (60, 60, 60), bg_rect) # Dark Gray
+    
+    hp_rect = pygame.Rect(x, y, int(bar_width * health_ratio), bar_height)
+    pygame.draw.rect(surface, (50, 200, 50), hp_rect) # Green
+    
+    if player.armor > 0:
+        armor_width = (player.armor / ARMOR_MAX_STACK) * bar_width
+        armor_rect = pygame.Rect(x, y + bar_height - 5, int(armor_width), 5)
+        pygame.draw.rect(surface, (0, 191, 255), armor_rect) # Deep Sky Blue
+        
+    # 4. Draw Border
+    pygame.draw.rect(surface, (255, 255, 255), bg_rect, 2) # White Border
+    
+    # 5. Text Percentage
+    hp_text = HUD_FONT.render(f"{int(player.hp)} HP", True, (255, 255, 255))
+    surface.blit(hp_text, (x + bar_width + 10, y - 5))
 
 
 def draw_held_gun(surface, gun, player, map_data_module):
@@ -360,8 +373,8 @@ def reset_round():
 def reset_game():
     global game_state, winner_text, start_time, last_shrink_time
     md.reset_grid()
-    player1.hp    = 3
-    player2.hp    = 3
+    player1.hp = 100  # Updated from 3
+    player2.hp = 100  # Updated from 3
     player1.armor = 0
     player2.armor = 0
     reset_round()
@@ -681,12 +694,12 @@ while True:
     # HUD — Player 1 top-left
     screen.blit(HUD_FONT.render(p1_name, True, (255, 255, 255)), (10, 10))
     draw_weapon_ui(screen, gun1, gun2, player1, 10, 42)
-    draw_health_bar(screen, player1, 10, 78)
+    draw_health_bar(screen, player1, 10, 80) # Adjusted Y
 
     # HUD — Player 2 bottom-left
-    screen.blit(HUD_FONT.render(p2_name, True, (255, 255, 255)), (10, HEIGHT - 105))
-    draw_weapon_ui(screen, gun1, gun2, player2, 10, HEIGHT - 70)
-    draw_health_bar(screen, player2, 10, HEIGHT - 34)
+    screen.blit(HUD_FONT.render(p2_name, True, (255, 255, 255)), (10, HEIGHT - 115))
+    draw_weapon_ui(screen, gun1, gun2, player2, 10, HEIGHT - 80)
+    draw_health_bar(screen, player2, 10, HEIGHT - 40) # Adjusted Y
 
     if game_state == "playing":
         timer_text = HUD_FONT.render(f"Time: {time_left // 1000}", True, (255, 255, 255))
