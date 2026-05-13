@@ -5,37 +5,37 @@ import map_data
 GUN_TYPES = {
     "pistol":  {
         "ammo": 8,  "bullet_speed": 300, "cooldown": 400,
-        "damage": 1,   "range": 300, "duration": 15000,
+        "damage": 15,   "range": 300, "duration": 15000,
         "path": "assets/guns/Glock18c-PxNBG.png",
         "map_scale": 0.8, "equip_scale": 0.5,
     },
     "rifle":   {
         "ammo": 20, "bullet_speed": 500, "cooldown": 120,
-        "damage": 1.5, "range": 600, "duration": 15000,
+        "damage": 30, "range": 600, "duration": 15000,
         "path": "assets/guns/M4A1-Px-PxNBG.png",
         "map_scale": 0.6, "equip_scale": 0.4,
     },
     "shotgun": {
         "ammo": 5,  "bullet_speed": 200, "cooldown": 800,
-        "damage": 0.7, "spread": 8, "range": 150, "duration": 15000,
+        "damage": 50, "spread": 8, "range": 150, "duration": 15000,
         "path": "assets/guns/Rem870-Px-PxNBG.png",
         "map_scale": 0.5, "equip_scale": 0.4,
     },
     "smg": {
         "ammo": 30, "bullet_speed": 400, "cooldown": 80,
-        "damage": 0.8, "range": 400, "duration": 12000,
+        "damage": 15, "range": 400, "duration": 12000,
         "path": "assets/guns/MP7-PxNBG.png",
         "map_scale": 0.7, "equip_scale": 0.6,
     },
     "sniper": {
         "ammo": 5, "bullet_speed": 800, "cooldown": 1500,
-        "damage": 3.0, "range": 1000, "duration": 15000,
+        "damage": 50, "range": 1000, "duration": 15000,
         "path": "assets/guns/M82A1-PxNBG.png",
         "map_scale": 0.5, "equip_scale": 0.4,
     },
     "rocket_launcher": {
         "ammo": 3, "bullet_speed": 250, "cooldown": 2000,
-        "damage": 2.5, "range": 500, "duration": 15000,
+        "damage": 75, "range": 500, "duration": 15000,
         "explosion_radius": 3, "is_explosive": True,
         "path": "assets/guns/AT4-PxNBG.png",
         "map_scale": 0.55, "equip_scale": 0.38,
@@ -50,7 +50,7 @@ GUN_COOLDOWNS = {
     "shotgun": 12000,
     "smg":     10000,
     "sniper":  20000,
-    "rocket_launcher": 25000,
+    "rocket_launcher": 2,
 }
 gun_last_used = {"pistol": 0, "rifle": 0, "shotgun": 0, "smg": 0, "sniper": 0, "rocket_launcher": 0}
 
