@@ -192,12 +192,6 @@ def draw_health_bar(surface, player, x, y, bar_width=200, bar_height=20):
     The rightmost `armor` slots show ArHeart; the rest show normal hearts.
     When armor is lost it instantly reverts to a normal heart.
     """
-    TOTAL_HEARTS = 3
-    for i in range(TOTAL_HEARTS):
-        # Armor occupies the rightmost slots
-        is_armor = i >= (TOTAL_HEARTS - player.armor)
-        img = AR_HEART_IMG if is_armor else HEART_IMG
-        surface.blit(img, (x + i * 28, y))
 
     # Constants for health
     MAX_HP = 100
@@ -218,8 +212,11 @@ def draw_health_bar(surface, player, x, y, bar_width=200, bar_height=20):
     # 4. Draw Border
     pygame.draw.rect(surface, (255, 255, 255), bg_rect, 2) # White Border
     
-    # 5. Text Percentage
-    hp_text = HUD_FONT.render(f"{int(player.hp)} HP", True, (255, 255, 255))
+    # 5. Text showing HP and Armor
+    if player.armor > 0:
+        hp_text = HUD_FONT.render(f"{int(player.hp)} HP | {int(player.armor)} AR", True, (255, 255, 255))
+    else:
+        hp_text = HUD_FONT.render(f"{int(player.hp)} HP", True, (255, 255, 255))
     surface.blit(hp_text, (x + bar_width + 10, y - 5))
 
 
@@ -601,10 +598,11 @@ while True:
         if armor_pickup.pos:
             for player in (player1, player2):
                 if player.pos == armor_pickup.pos:
+                    # Only collect if player doesn't have full armor
                     if player.armor < ARMOR_MAX_STACK:
-                        player.armor += 1
-                    armor_pickup.clear()
-                    last_armor_spawn_time = current_time
+                        player.armor = ARMOR_MAX_STACK  # Fully restore armor
+                        armor_pickup.clear()
+                        last_armor_spawn_time = current_time
                     break
 
         # Bullet update — returns (hit_player, armor_absorbed)
