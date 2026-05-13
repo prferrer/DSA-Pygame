@@ -19,7 +19,26 @@ GUN_TYPES = {
         "ammo": 5,  "bullet_speed": 200, "cooldown": 800,
         "damage": 0.7, "spread": 8, "range": 150, "duration": 15000,
         "path": "assets/guns/Rem870-Px-PxNBG.png",
-        "map_scale": 0.6, "equip_scale": 0.4,
+        "map_scale": 0.5, "equip_scale": 0.4,
+    },
+    "smg": {
+        "ammo": 30, "bullet_speed": 400, "cooldown": 80,
+        "damage": 0.8, "range": 400, "duration": 12000,
+        "path": "assets/guns/MP7-PxNBG.png",
+        "map_scale": 0.7, "equip_scale": 0.6,
+    },
+    "sniper": {
+        "ammo": 5, "bullet_speed": 800, "cooldown": 1500,
+        "damage": 3.0, "range": 1000, "duration": 15000,
+        "path": "assets/guns/M82A1-PxNBG.png",
+        "map_scale": 0.5, "equip_scale": 0.4,
+    },
+    "rocket_launcher": {
+        "ammo": 3, "bullet_speed": 250, "cooldown": 2000,
+        "damage": 2.5, "range": 500, "duration": 15000,
+        "explosion_radius": 3, "is_explosive": True,
+        "path": "assets/guns/AT4-PxNBG.png",
+        "map_scale": 0.55, "equip_scale": 0.38,
     },
 }
 
@@ -29,8 +48,11 @@ GUN_COOLDOWNS = {
     "pistol":  400,
     "rifle":   15000,
     "shotgun": 12000,
+    "smg":     10000,
+    "sniper":  20000,
+    "rocket_launcher": 25000,
 }
-gun_last_used = {"pistol": 0, "rifle": 0, "shotgun": 0}
+gun_last_used = {"pistol": 0, "rifle": 0, "shotgun": 0, "smg": 0, "sniper": 0, "rocket_launcher": 0}
 
 
 # ── Image loading ─────────────────────────────────────────────────────────────
@@ -155,6 +177,8 @@ def shoot(gun, player, bullets, current_time, map_data_module):
         "max_range": gun_data["range"],
         "distance_traveled": 0,
         "owner": player,
+        "is_explosive": gun_data.get("is_explosive", False),
+        "explosion_radius": gun_data.get("explosion_radius", 0),
     }
 
     if gun.type == "shotgun":
