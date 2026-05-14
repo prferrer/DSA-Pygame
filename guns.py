@@ -34,7 +34,7 @@ GUN_TYPES = {
         "map_scale": 0.5, "equip_scale": 0.4,
     },
     "rocket_launcher": {
-        "ammo": 3, "bullet_speed": 250, "cooldown": 2000,
+        "ammo": 1, "bullet_speed": 250, "cooldown": 2000,
         "damage": 75, "range": 500, "duration": 15000,
         "explosion_radius": 3, "is_explosive": True,
         "path": "assets/guns/AT4-PxNBG.png",
