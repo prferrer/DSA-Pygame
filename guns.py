@@ -34,7 +34,7 @@ GUN_TYPES = {
         "map_scale": 0.5, "equip_scale": 0.4,
     },
     "rocket_launcher": {
-        "ammo": 1, "bullet_speed": 250, "cooldown": 2000,
+        "ammo": 3, "bullet_speed": 250, "cooldown": 2000,
         "damage": 75, "range": 500, "duration": 15000,
         "explosion_radius": 3, "is_explosive": True,
         "path": "assets/guns/AT4-PxNBG.png",
@@ -50,7 +50,7 @@ GUN_COOLDOWNS = {
     "shotgun": 12000,
     "smg":     10000,
     "sniper":  20000,
-    "rocket_launcher": 2,
+    "rocket_launcher": 20000,
 }
 gun_last_used = {"pistol": 0, "rifle": 0, "shotgun": 0, "smg": 0, "sniper": 0, "rocket_launcher": 0}
 
@@ -174,11 +174,17 @@ def shoot(gun, player, bullets, current_time, map_data_module):
         "dx": dx, "dy": dy,
         "speed": gun_data["bullet_speed"],
         "damage": gun_data["damage"],
+        "original_damage": gun_data["damage"],  # Store original damage for penetration calculations
         "max_range": gun_data["range"],
         "distance_traveled": 0,
         "owner": player,
         "is_explosive": gun_data.get("is_explosive", False),
         "explosion_radius": gun_data.get("explosion_radius", 0),
+        "can_penetrate": gun.type == "sniper",  # Only sniper can penetrate
+        "walls_penetrated": 0,  # Track how many walls penetrated
+        "max_wall_penetration": 3,  # Sniper can penetrate up to 2 walls
+        "last_grid_x": -1,  # Track last grid position to avoid recounting same wall
+        "last_grid_y": -1,
     }
 
     if gun.type == "shotgun":
