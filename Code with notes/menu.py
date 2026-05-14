@@ -1,18 +1,3 @@
-"""
-menu.py  –  PvP Shooter Game – Character & Map Selection Screen
-================================================================
-HOW TO CONNECT TO main.py
---------------------------
-    from menu import run_menu
-
-    result = run_menu()
-    if result:
-        p1_color, p1_hat, p2_color, p2_hat, chosen_map = result
-        # pass these into your game initialisation
-    else:
-        pygame.quit()
-        sys.exit()
-"""
 
 import os
 import math
@@ -28,7 +13,7 @@ HAT_DIR = os.path.join(_HERE, "assets", "hats")
 MAP_DIR = os.path.join(_HERE, "assets", "maps")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CONSTANTS
+# CONSTANTS ()
 # ──────────────────────────────────────────────────────────────────────────────
 
 TARGET_W, TARGET_H = 1536, 864   # logical canvas (fits 1920x1080 @ 125% scale)
@@ -56,7 +41,7 @@ PLAYER_COLORS = [
 ]
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ASSET LOADER
+# ASSET LOADER (I-loload yung assets for hats and pets)
 # ──────────────────────────────────────────────────────────────────────────────
 
 _hat_images = {}
@@ -92,7 +77,7 @@ def _load_assets():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# DRAWING HELPERS
+# DRAWING HELPERS (yung kakaibang shaped na repetitively nakikita sa menu)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def draw_rounded_rect(surf, color, rect, radius=16, border=0, border_color=None):
@@ -112,16 +97,10 @@ def draw_gradient_rect(surf, rect, top_color, bot_color):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CHARACTER PREVIEW  (square only – no body)
+# CHARACTER PREVIEW  (pag nag select ka ng color and hat iprepresent sa character preview din)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def draw_character(surf, cx, cy, size, body_color, hat_name):
-    """
-    Draw a plain coloured square with two eyes and a hat on top.
-    cx, cy = centre of the square.
-    size   = side length of the square.
-    Hat is drawn above the square, clipped to its width.
-    """
     half = size // 2
     sq   = pygame.Rect(cx - half, cy - half, size, size)
 
@@ -155,10 +134,11 @@ def draw_character(surf, cx, cy, size, body_color, hat_name):
 
         surf.blit(scaled_hat, (cx - hw // 2, hat_y))
     else:
-        # procedural fallback – draws hat above square top edge
+        # procedural fallback – draws hat above square top edge (if ever lang di mapresent ng maayos)
         hat_top = cy - half    # y of the square's top edge
         hh      = half // 2    # generic hat height
 
+        # not important for algo because this is a "just in case" di magload yung assets ng hat
         if hat_name == "Crown":
             base_y = hat_top
             pts = [
@@ -217,11 +197,8 @@ def draw_character(surf, cx, cy, size, body_color, hat_name):
                 pygame.draw.circle(surf, GOLD, (sx, sy), 3)
         # "None" -> draw nothing
         
+#How the hat is presented on top of the character preview
 def draw_hat_only(surf, cx, cy, size, hat_name):
-    """
-    Draws only the selected hat, without showing the character body.
-    Used for the hat selection grid.
-    """
     hat_img = _hat_images.get(hat_name)
 
     if hat_name == "None":
@@ -249,7 +226,7 @@ def draw_hat_only(surf, cx, cy, size, hat_name):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# MAP THUMBNAIL
+# MAP THUMBNAIL (yung square kung nasan yung maps)
 # ──────────────────────────────────────────────────────────────────────────────
 
 _MAP_GRAD = {
@@ -300,7 +277,7 @@ def draw_map_thumbnail(surf, rect, map_name):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# UI WIDGETS
+# UI WIDGETS (buttons for map selection, hat selection, color selection and write ng name here nangyayari)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class ColorSwatch:
@@ -330,7 +307,6 @@ class ColorSwatch:
 
 
 class HatButton:
-    """2-column scrollable hat picker cell."""
     BTN_W = 110
     BTN_H = 110
 
@@ -449,7 +425,7 @@ class GoButton:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# BACKGROUND PARTICLES
+# BACKGROUND PARTICLES (mga nagflofloat na white sa bg)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class Particle:
@@ -478,7 +454,7 @@ class Particle:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# MAIN MENU FUNCTION
+# MAIN MENU FUNCTION (eto na galawan ng main menu mismo)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def run_menu(screen=None):
@@ -514,7 +490,6 @@ def run_menu(screen=None):
     font_small = F(17)
     font_go    = F(58, bold=True)
 
-    # ── layout constants ──────────────────────────────────────────────────────
     # ── layout constants ──────────────────────────────────────────────────────
     PAD  = 28
     MID_X = CW // 2
@@ -633,7 +608,7 @@ def run_menu(screen=None):
     p2_up_arr = ScrollArrow(p2_up_r, 'up')
     p2_dn_arr = ScrollArrow(p2_dn_r, 'down')
 
-    # ── state ─────────────────────────────────────────────────────────────────
+    # ── state (ano state ng lahat pag wala pa pinipili) ─────────────────────────────────────────────────────────────────
     p1_color_idx  = 0
     p2_color_idx  = 1
     p1_hat_idx    = 0
@@ -654,7 +629,7 @@ def run_menu(screen=None):
     particles = [Particle(CW, CH) for _ in range(55)]
 
     # ──────────────────────────────────────────────────────────────────────────
-    # STATE HELPERS
+    # STATE HELPERS (minamake sure na nakukuha yung pinili ng player and maprepresent)
     # ──────────────────────────────────────────────────────────────────────────
 
     def refresh_hat_preview_colors():
@@ -822,7 +797,7 @@ def run_menu(screen=None):
         return bx, by, sc
 
     # ──────────────────────────────────────────────────────────────────────────
-    # EVENT LOOP
+    # EVENT LOOP (Logic ng menu mismo)
     # ──────────────────────────────────────────────────────────────────────────
 
     offset_x = offset_y = 0
@@ -964,7 +939,7 @@ def run_menu(screen=None):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# STANDALONE TEST  (python menu.py)
+# STANDALONE TEST  (python menu.py) (no importance pero basically para makita sa termininal if gumagana yung selection)
 # ──────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     result = run_menu()
