@@ -23,19 +23,19 @@ GUN_TYPES = {
     },
     "smg": {
         "ammo": 30, "bullet_speed": 400, "cooldown": 80,
-        "damage": 15, "range": 300, "duration": 12000,
+        "damage": 15, "range": 200, "duration": 12000,
         "path": "assets/guns/MP7-PxNBG.png",
         "map_scale": 0.7, "equip_scale": 0.6,
     },
     "sniper": {
         "ammo": 5, "bullet_speed": 800, "cooldown": 1500,
-        "damage": 50, "range": 1500, "duration": 15000,
+        "damage": 50, "range": 2000, "duration": 15000,
         "path": "assets/guns/M82A1-PxNBG.png",
         "map_scale": 0.5, "equip_scale": 0.4,
     },
     "rocket_launcher": {
         "ammo": 3, "bullet_speed": 250, "cooldown": 2000,
-        "damage": 75, "range": 500, "duration": 15000,
+        "damage": 75, "range": 1000, "duration": 15000,
         "explosion_radius": 3, "is_explosive": True,
         "spread": 6,   # Pixel amplitude of wave motion for rocket
         "path": "assets/guns/AT4-PxNBG.png",
