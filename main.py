@@ -43,13 +43,18 @@ p2_spawn = md.get_valid_spawn(False)
 player1  = Player(p1_spawn[0], p1_spawn[1], p1_color)
 player2  = Player(p2_spawn[0], p2_spawn[1], p2_color)
 
+# Initialize armor HP tracking for new armor system
+# Each armor unit has 33.33 HP
+player1.armor_hp = 0
+player2.armor_hp = 0
+
 # ── Dual guns ─────────────────────────────────────────────────────────────────
 gun1 = GunSystem()
 gun2 = GunSystem()
 gun1.spawn(md.map_data)
 gun2.spawn(md.map_data, occupied_positions=[gun1.pos] if gun1.pos else [])
 
-GUN_RESPAWN_TIME     = 5000
+GUN_RESPAWN_TIME     = 1000
 last_gun1_spawn_time = pygame.time.get_ticks()
 last_gun2_spawn_time = pygame.time.get_ticks()
 
@@ -187,10 +192,9 @@ recalculate_layout()
 
 def draw_health_bar(surface, player, x, y, bar_width=200, bar_height=20):
     """
-<<<<<<< HEAD
-    Always draws exactly 3 heart slots.
-    The rightmost `armor` slots show ArHeart; the rest show normal hearts.
-    When armor is lost it instantly reverts to a normal heart.
+    Draws health bar with armor count display.
+    Each armor unit has 33.33 HP, max 3 armor.
+    Shows: HP bar (green) + Armor indicator (blue strip) + Text showing armor count
     """
 
     # Constants for health
@@ -201,18 +205,33 @@ def draw_health_bar(surface, player, x, y, bar_width=200, bar_height=20):
     bg_rect = pygame.Rect(x, y, bar_width, bar_height)
     pygame.draw.rect(surface, (60, 60, 60), bg_rect) # Dark Gray
     
+    # 2. Draw HP (Green)
     hp_rect = pygame.Rect(x, y, int(bar_width * health_ratio), bar_height)
     pygame.draw.rect(surface, (50, 200, 50), hp_rect) # Green
     
+    # 3. Draw Armor indicator (Blue strip at bottom showing armor HP)
     if player.armor > 0:
-        armor_width = (player.armor / ARMOR_MAX_STACK) * bar_width
-        armor_rect = pygame.Rect(x, y + bar_height - 5, int(armor_width), 5)
-        pygame.draw.rect(surface, (0, 191, 255), armor_rect) # Deep Sky Blue
+        # 1. Determine color based on armor value
+        if player.armor == 1:
+            armor_color = (255, 0, 0)      # Red
+        elif player.armor == 2:
+            armor_color = (255, 255, 0)    # Yellow
+        else:
+            armor_color = (0, 0, 255)      # Blue (Value 3+)
+
+        # 2. Calculate dimensions
+        max_armor_hp = player.armor * 33.33
+        armor_ratio = player.armor_hp / max_armor_hp if max_armor_hp > 0 else 0
+        armor_width = armor_ratio * bar_width
         
+        # 3. Draw the rect
+        armor_rect = pygame.Rect(x, y + bar_height - 5, int(armor_width), 5)
+        pygame.draw.rect(surface, armor_color, armor_rect)
+            
     # 4. Draw Border
     pygame.draw.rect(surface, (255, 255, 255), bg_rect, 2) # White Border
     
-    # 5. Text showing HP and Armor
+    # 5. Text showing HP and Armor count
     if player.armor > 0:
         hp_text = HUD_FONT.render(f"{int(player.hp)} HP | {int(player.armor)} AR", True, (255, 255, 255))
     else:
@@ -598,9 +617,10 @@ while True:
         if armor_pickup.pos:
             for player in (player1, player2):
                 if player.pos == armor_pickup.pos:
-                    # Only collect if player doesn't have full armor
-                    if player.armor < ARMOR_MAX_STACK:
-                        player.armor = ARMOR_MAX_STACK  # Fully restore armor
+                    # Only collect if player doesn't have full armor (max 3)
+                    if player.armor < 3:
+                        player.armor += 1  # Add 1 armor unit
+                        player.armor_hp = player.armor * 33.33  # Set armor HP to full for current armor count
                         armor_pickup.clear()
                         last_armor_spawn_time = current_time
                     break
