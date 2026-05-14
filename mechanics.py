@@ -3,14 +3,6 @@ from guns import GUN_TYPES
 
 
 def update_bullets(bullets, players, map_data_module, dt):
-    """
-    Move every bullet, check wall and player collisions.
-    Handle explosive bullets (rockets) with area damage.
-
-    Returns a tuple  (hit_player, armor_absorbed)
-      hit_player    – the Player instance that was hit, or None
-      armor_absorbed – True if the hit was soaked by armor (player does NOT respawn)
-    """
     hit_player     = None
     armor_absorbed = False
 
@@ -216,19 +208,6 @@ def handle_explosion(bullet, players, map_data_module, current_hit_player, curre
 
 
 def try_melee(attacker, defender, current_time, active_animations, map_data_module):
-    """
-    Attempt a melee strike from `attacker` toward `defender`.
-
-    Rules
-    -----
-    • Attacker must NOT own a gun (checked in main before calling).
-    • Attacker must have waited MELEE_COOLDOWN ms since last swing.
-    • Defender must be standing on the tile directly in front of attacker.
-    • On success: defender is stunned for MELEE_STUN_DURATION ms.
-    • A hit-spark animation entry is added to active_animations.
-
-    Returns True if a hit landed, False otherwise.
-    """
     from config import MELEE_COOLDOWN, MELEE_STUN_DURATION, MELEE_ANIM_DURATION
 
     # Cooldown gate
