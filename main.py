@@ -31,7 +31,7 @@ if menu_result is None:
     pygame.quit()
     sys.exit()
 
-p1_name, p1_color, p1_hat, p2_name, p2_color, p2_hat, selected_map_name = menu_result 
+p1_name, p1_color, p1_hat, p1_glasses, p1_pet, p2_name, p2_color, p2_hat, p2_glasses, p2_pet, selected_map_name = menu_result 
 
 md.init_map(selected_map_name)
 
@@ -100,6 +100,33 @@ def _load_img(path, fallback_color=(255, 0, 0), size=(24, 24)):
 HEART_IMG    = pygame.transform.scale(_load_img("assets/health/hearts.png"),   (24, 24))
 AR_HEART_IMG = pygame.transform.scale(_load_img("assets/health/ArHeart.png"),  (24, 24))
 
+# ── GLASSES ────────────────────────────────────────────────────
+GLASSES_IMAGES = {}
+def load_glasses_images():
+    hat_dir = os.path.join(_HERE, "assets", "glasses")
+    for glasses_name in ["None", "Round", "Sunglasses", "Red", "Black", "Pink"]:
+        path = os.path.join(hat_dir, f"{glasses_name}.png")
+        GLASSES_IMAGES[glasses_name] = (
+            pygame.image.load(path).convert_alpha() if os.path.isfile(path) else None
+        )
+load_glasses_images()
+
+# ── PET ────────────────────────────────────────────────────────
+PET_IMAGES = {}
+
+def load_pet_images():
+    pet_dir = os.path.join(_HERE, "assets", "pets")
+
+    for pet_name in ["Dragon", "Panda", "Rabbit"]:
+        path = os.path.join(pet_dir, f"{pet_name}.png")
+
+        if os.path.isfile(path):
+            PET_IMAGES[pet_name] = pygame.image.load(path).convert_alpha()
+        else:
+            PET_IMAGES[pet_name] = None
+
+load_pet_images()
+
 try:
     SPEED_IMG = pygame.image.load("assets/powerups/speedboost.png").convert_alpha()
 except Exception:
@@ -128,6 +155,8 @@ SFX_SPEED = _load_sound("assets/SE/speed.mp3")
 SFX_SLOW  = _load_sound("assets/SE/slow.mp3")
 SFX_ARMOR = _load_sound("assets/SE/armor.mp3")
 SFX_TP = _load_sound("assets/SE/teleport.mp3")
+SFX_MELEE = _load_sound("assets/SE/melee.mp3")
+SFX_PICKUP = _load_sound("assets/SE/pickup.mp3")
 
 # Melee hit-spark frames Hit1.png … Hit5.png
 MELEE_FRAMES = []
@@ -431,6 +460,77 @@ def draw_player_hat(surface, player, hat_name):
     px = md.map_data.offset_x + player.pos[0] * ts
     py = md.map_data.offset_y + player.pos[1] * ts
     surface.blit(scaled, (px + (ts - hat_w) // 2, py - int(hat_h * 0.80)))
+    
+def draw_player_glasses(surface, player, glasses_name):
+    if glasses_name == "None":
+        return
+    img = GLASSES_IMAGES.get(glasses_name)
+    if img is None:
+        return
+    ts = md.map_data.TILE_SIZE
+    px = md.map_data.offset_x + player.pos[0] * ts
+    py = md.map_data.offset_y + player.pos[1] * ts
+    g_w = int(ts * 1.1)
+    ratio = g_w / img.get_width()
+    g_h = int(img.get_height() * ratio)
+    scaled = pygame.transform.smoothscale(img, (g_w, g_h))
+    if glasses_name == "Red":
+        surface.blit(scaled, (px + (ts - g_w)//2, py + ts//3 - 4))
+    elif glasses_name == "Round":
+        surface.blit(scaled, (px + (ts - g_w)//2, py + ts//3 - 2))
+    else:
+        surface.blit(scaled, (px + (ts - g_w)//2, py + ts//3))
+        
+def draw_pet(surface, player, pet_name):
+    if pet_name == "None":
+        return
+
+    pet_img = PET_IMAGES.get(pet_name)
+
+    if pet_img is None:
+        return
+
+    ts = md.map_data.TILE_SIZE
+
+    # Pet smaller than player
+    pet_size = int(ts * 0.65)
+
+    pet_scaled = pygame.transform.smoothscale(
+        pet_img,
+        (pet_size, pet_size)
+    )
+
+    # Player position
+    px = md.map_data.offset_x + player.pos[0] * ts
+    py = md.map_data.offset_y + player.pos[1] * ts
+
+    dx, dy = player.dir
+
+    # Distance from player
+    offset = int(ts * 0.9)
+
+    # Pet switches side depending on movement direction
+    if dx == 1:  # right
+        pet_x = px - offset
+        pet_y = py + ts // 5
+
+    elif dx == -1:  # left
+        pet_x = px + offset
+        pet_y = py + ts // 5
+
+    elif dy == -1:  # up
+        pet_x = px - offset
+        pet_y = py + ts // 3
+
+    elif dy == 1:  # down
+        pet_x = px + offset
+        pet_y = py + ts // 3
+
+    else:
+        pet_x = px - offset
+        pet_y = py
+
+    surface.blit(pet_scaled, (pet_x, pet_y))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -620,6 +720,10 @@ while True:
         if p1_action_pressed and not p1_has_gun:
             if current_time - player1.last_melee >= MELEE_COOLDOWN:
                 player1.last_melee = current_time
+
+                if SFX_MELEE:
+                    SFX_MELEE.play()
+
                 active_animations.append({
                     "attacker": player1,
                     "start":    current_time,
@@ -629,10 +733,16 @@ while True:
                 swing_ty = player1.pos[1] + player1.dir[1]
                 if [swing_tx, swing_ty] == player2.pos:
                     player2.stunned_until = current_time + MELEE_STUN_DURATION
+                    if SFX_MELEE:
+                        SFX_MELEE.play()
 
         if p2_action_pressed and not p2_has_gun:
             if current_time - player2.last_melee >= MELEE_COOLDOWN:
                 player2.last_melee = current_time
+                
+                if SFX_MELEE:
+                    SFX_MELEE.play()
+                
                 active_animations.append({
                     "attacker": player2,
                     "start":    current_time,
@@ -642,6 +752,8 @@ while True:
                 swing_ty = player2.pos[1] + player2.dir[1]
                 if [swing_tx, swing_ty] == player1.pos:
                     player1.stunned_until = current_time + MELEE_STUN_DURATION
+                    if SFX_MELEE:
+                        SFX_MELEE.play()
 
         # Gun pickup — a player who already owns a gun cannot pick up a second one
         for g in (gun1, gun2):
@@ -650,8 +762,13 @@ while True:
                 p2_owns_gun = (gun1.owner == player2 or gun2.owner == player2)
                 if player1.pos == g.pos and not p1_owns_gun:
                     g.pickup(player1, current_time)
+                    if SFX_PICKUP:
+                        SFX_PICKUP.play()
+
                 elif player2.pos == g.pos and not p2_owns_gun:
                     g.pickup(player2, current_time)
+                    if SFX_PICKUP:
+                        SFX_PICKUP.play()
 
         # Gun expiry / ammo depletion / map despawn
         for g, spawn_key in ((gun1, "last_gun1_spawn_time"),
@@ -837,6 +954,10 @@ while True:
 
     draw_player_hat(screen, player1, p1_hat)
     draw_player_hat(screen, player2, p2_hat)
+    draw_player_glasses(screen, player1, p1_glasses)
+    draw_player_glasses(screen, player2, p2_glasses)
+    draw_pet(screen, player1, p1_pet)
+    draw_pet(screen, player2, p2_pet)
 
     # Held guns (draw for both slots)
     for g in (gun1, gun2):
