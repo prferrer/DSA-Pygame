@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import math
 import os
 
 from menu import run_menu
@@ -69,6 +70,10 @@ armor_pickup.spawn(md.map_data, pygame.time.get_ticks())
 # List of dicts: {cx, cy, start, duration, frame}
 active_animations = []
 
+# ── Explosion animations ───────────────────────────────────────────────────────
+# List of dicts: {x, y, start, duration, frame, radius}
+explosion_animations = []
+
 # ── Game state ────────────────────────────────────────────────────────────────
 start_time       = pygame.time.get_ticks()
 last_shrink_time = start_time
@@ -117,6 +122,19 @@ for _i in range(1, 6):
         _fb = pygame.Surface((48, 48), pygame.SRCALPHA)
         pygame.draw.circle(_fb, (255, 200, 0, 200), (24, 24), 24 - _i * 3)
         MELEE_FRAMES.append(_fb)
+
+# Explosion frames boom1.png … boom5.png
+BOOM_FRAMES = []
+for _i in range(1, 6):
+    _path = os.path.join(_HERE, f"assets/boom/boom{_i}.png")
+    try:
+        BOOM_FRAMES.append(pygame.image.load(_path).convert_alpha())
+    except Exception:
+        # Fallback: simple orange expanding circle
+        _fb = pygame.Surface((128, 128), pygame.SRCALPHA)
+        _r  = 10 + _i * 18
+        pygame.draw.circle(_fb, (255, 140 - _i * 20, 0, max(30, 220 - _i * 40)), (64, 64), _r)
+        BOOM_FRAMES.append(_fb)
 
 # Map backgrounds
 MAP_BACKGROUNDS = {
@@ -192,13 +210,14 @@ recalculate_layout()
 
 def draw_health_bar(surface, player, x, y, bar_width=200, bar_height=20):
     """
-    Draws health bar with armor count display.
-    Each armor unit has 33.33 HP, max 3 armor.
-    Shows: HP bar (green) + Armor indicator (blue strip) + Text showing armor count
+    Draws health bar with armor HP display.
+    Each armor unit has 33.33 HP, max 3 armor (100 total armor HP).
+    Shows: HP bar (green) + Armor HP bar (blue with depletion) + Text showing armor HP
     """
 
     # Constants for health
     MAX_HP = 100
+    MAX_ARMOR_HP = 100  # 3 armor units * 33.33 HP each
     health_ratio = max(0, player.hp / MAX_HP)
     
     # 1. Draw Background (Empty Bar)
@@ -209,31 +228,33 @@ def draw_health_bar(surface, player, x, y, bar_width=200, bar_height=20):
     hp_rect = pygame.Rect(x, y, int(bar_width * health_ratio), bar_height)
     pygame.draw.rect(surface, (50, 200, 50), hp_rect) # Green
     
-    # 3. Draw Armor indicator (Blue strip at bottom showing armor HP)
-    if player.armor > 0:
-        # 1. Determine color based on armor value
-        if player.armor == 1:
-            armor_color = (255, 0, 0)      # Red
-        elif player.armor == 2:
-            armor_color = (255, 255, 0)    # Yellow
-        else:
-            armor_color = (0, 0, 255)      # Blue (Value 3+)
-
-        # 2. Calculate dimensions
-        max_armor_hp = player.armor * 33.33
-        armor_ratio = player.armor_hp / max_armor_hp if max_armor_hp > 0 else 0
-        armor_width = armor_ratio * bar_width
+    # 3. Draw Armor HP (Blue with depletion visible)
+    if player.armor_hp > 0:
+        # Calculate armor HP ratio
+        armor_hp_ratio = max(0, min(1, player.armor_hp / MAX_ARMOR_HP))
         
-        # 3. Draw the rect
-        armor_rect = pygame.Rect(x, y + bar_height - 5, int(armor_width), 5)
-        pygame.draw.rect(surface, armor_color, armor_rect)
+        # Draw armor HP as a blue overlay that depletes
+        armor_width = int(bar_width * armor_hp_ratio)
+        armor_rect = pygame.Rect(x, y, armor_width, bar_height)
+        
+        # Use a semi-transparent blue for armor
+        armor_surface = pygame.Surface((armor_width, bar_height), pygame.SRCALPHA)
+        armor_surface.fill((50, 150, 255, 180))  # Blue with alpha
+        surface.blit(armor_surface, (x, y))
+        
+        # Draw segment dividers to show the 3 armor units
+        segment_width = bar_width // 3
+        for i in range(1, 3):
+            divider_x = x + (i * segment_width)
+            pygame.draw.line(surface, (200, 200, 255), 
+                           (divider_x, y), (divider_x, y + bar_height), 2)
             
     # 4. Draw Border
     pygame.draw.rect(surface, (255, 255, 255), bg_rect, 2) # White Border
     
-    # 5. Text showing HP and Armor count
-    if player.armor > 0:
-        hp_text = HUD_FONT.render(f"{int(player.hp)} HP | {int(player.armor)} AR", True, (255, 255, 255))
+    # 5. Text showing HP and Armor HP
+    if player.armor_hp > 0:
+        hp_text = HUD_FONT.render(f"{int(player.hp)} HP | {int(player.armor_hp)} AR", True, (255, 255, 255))
     else:
         hp_text = HUD_FONT.render(f"{int(player.hp)} HP", True, (255, 255, 255))
     surface.blit(hp_text, (x + bar_width + 10, y - 5))
@@ -338,7 +359,41 @@ def draw_melee_animations(surface, current_time):
 
 def draw_bullets(surface, bullets):
     for b in bullets:
-        pygame.draw.rect(surface, (255, 255, 0), (int(b["x"]), int(b["y"]), 8, 8))
+        if b.get("is_explosive", False):
+            # Draw rocket as a glowing orange circle
+            pygame.draw.circle(surface, (255, 140, 0), (int(b["x"]), int(b["y"])), 6)
+            pygame.draw.circle(surface, (255, 220, 100), (int(b["x"]), int(b["y"])), 3)
+        else:
+            pygame.draw.rect(surface, (255, 255, 0), (int(b["x"]), int(b["y"]), 8, 8))
+
+
+def draw_explosion_animations(surface, current_time):
+    """
+    Draw boom sprite frames centred on the explosion impact point.
+    Frames advance linearly over the animation duration.
+    """
+    for anim in explosion_animations[:]:
+        elapsed  = current_time - anim["start"]
+        progress = elapsed / anim["duration"]
+        if progress >= 1.0:
+            explosion_animations.remove(anim)
+            continue
+
+        frame_idx = min(int(progress * len(BOOM_FRAMES)), len(BOOM_FRAMES) - 1)
+        frame     = BOOM_FRAMES[frame_idx]
+
+        # Scale the frame to match the explosion radius
+        size   = max(32, int(anim["radius"] * 2.2))
+        scaled = pygame.transform.scale(frame, (size, size))
+
+        # Fade out in the final third
+        if progress > 0.65:
+            alpha = int(255 * (1.0 - (progress - 0.65) / 0.35))
+            scaled.set_alpha(alpha)
+
+        cx = int(anim["x"])
+        cy = int(anim["y"])
+        surface.blit(scaled, (cx - size // 2, cy - size // 2))
 
 
 def draw_player_hat(surface, player, hat_name):
@@ -377,11 +432,12 @@ def _drop_gun(gun, current_time):
 
 
 def reset_round():
-    global bullets, green_powerup, blue_powerup, active_animations
+    global bullets, green_powerup, blue_powerup, active_animations, explosion_animations
     global last_gun1_spawn_time, last_gun2_spawn_time, last_armor_spawn_time
 
     bullets.clear()
     active_animations.clear()
+    explosion_animations.clear()
 
     now = pygame.time.get_ticks()
 
@@ -576,13 +632,24 @@ while True:
                 elif player2.pos == g.pos and not p2_owns_gun:
                     g.pickup(player2, current_time)
 
-        # Gun expiry / ammo depletion
+        # Gun expiry / ammo depletion / map despawn
         for g, spawn_key in ((gun1, "last_gun1_spawn_time"),
                               (gun2, "last_gun2_spawn_time")):
+            # Equipped gun: expired duration or out of ammo
             expired = g.owner and g.pickup_time and (current_time - g.pickup_time >= g.duration)
             empty   = g.owner and g.ammo <= 0
+            # Floor gun: sitting on the map past its duration
+            map_expired = (g.pos and g.type
+                           and (current_time - g.map_spawn_time >= GUN_TYPES[g.type]["duration"]))
             if expired or empty:
                 g.drop(current_time)
+                if spawn_key == "last_gun1_spawn_time":
+                    last_gun1_spawn_time = current_time
+                else:
+                    last_gun2_spawn_time = current_time
+            elif map_expired:
+                g.pos            = None   # remove from map without crediting an owner
+                g.map_spawn_time = 0
                 if spawn_key == "last_gun1_spawn_time":
                     last_gun1_spawn_time = current_time
                 else:
@@ -617,17 +684,17 @@ while True:
         if armor_pickup.pos:
             for player in (player1, player2):
                 if player.pos == armor_pickup.pos:
-                    # Only collect if player doesn't have full armor (max 3)
-                    if player.armor < 3:
-                        player.armor += 1  # Add 1 armor unit
-                        player.armor_hp = player.armor * 33.33  # Set armor HP to full for current armor count
+                    # Only collect if player doesn't have full armor (max 100 armor HP = 3 units)
+                    if player.armor_hp < 100:
+                        player.armor_hp = min(100, player.armor_hp + 33.33)
+                        player.armor = min(3, max(0, math.ceil(player.armor_hp / 33.33)))
                         armor_pickup.clear()
                         last_armor_spawn_time = current_time
                     break
 
         # Bullet update — returns (hit_player, armor_absorbed)
         hit_player, armor_absorbed = update_bullets(
-            bullets, [player1, player2], md.map_data, dt
+            bullets, [player1, player2], md.map_data, dt, explosion_animations
         )
 
         if hit_player:
@@ -735,6 +802,7 @@ while True:
         draw_held_gun(screen, g, player2, md.map_data)
 
     draw_bullets(screen, bullets)
+    draw_explosion_animations(screen, current_time)
     draw_melee_animations(screen, current_time)
 
     # HUD — Player 1 top-left
