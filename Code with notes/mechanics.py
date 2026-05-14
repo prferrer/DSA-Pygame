@@ -137,12 +137,6 @@ def update_bullets(bullets, players, map_data_module, dt):
 
 
 def handle_explosion(bullet, players, map_data_module, current_hit_player, current_armor_absorbed):
-    """
-    Handle explosion damage for rocket launcher.
-    Damages all players within explosion_radius tiles of the impact point.
-    
-    Returns updated (hit_player, armor_absorbed) tuple.
-    """
     explosion_radius = bullet.get("explosion_radius", 0)
     if explosion_radius <= 0:
         return current_hit_player, current_armor_absorbed

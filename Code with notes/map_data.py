@@ -133,7 +133,6 @@ def init_map(map_name):
     offset_y = (HEIGHT - (MAP_ROWS * TILE_SIZE)) // 2
     shrink_layer = 0
 
-    print(f"[init_map] map={map_name}, p1 spawn={_SPAWNS.get(map_name, {}).get('p1')}, p2 spawn={_SPAWNS.get(map_name, {}).get('p2')}")
     map_data = MapData()
 
 def reset_grid():
@@ -165,8 +164,7 @@ def get_nearest_safe_tile(pos):
                 if 0 <= nx < MAP_COLS and 0 <= ny < MAP_ROWS:
                     if map_grid[ny][nx] == 0:
                         return [nx, ny]
-                    
-    print(f"[get_valid_spawn] map={_current_map_name}, is_p1={is_p1}, desired={desired}, tile={map_grid[y][x]}")
+                
     return pos
 
 def get_valid_spawn(is_p1):
