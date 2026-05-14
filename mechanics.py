@@ -1,15 +1,44 @@
 import pygame
+import math
 from guns import GUN_TYPES
 
 
-def update_bullets(bullets, players, map_data_module, dt):
+def update_bullets(bullets, players, map_data_module, dt, explosion_animations=None):
+    """
+    Move every bullet, check wall and player collisions.
+    Handle explosive bullets (rockets) with area damage.
+
+    Returns a tuple  (hit_player, armor_absorbed)
+      hit_player    – the Player instance that was hit, or None
+      armor_absorbed – True if the hit was soaked by armor (player does NOT respawn)
+    """
     hit_player     = None
     armor_absorbed = False
 
     for b in bullets[:]:
         distance_moved = float(b["speed"]) * float(dt)
-        b["x"] += b["dx"] * distance_moved
-        b["y"] += b["dy"] * distance_moved
+
+        # ── Wave motion for rocket launcher ───────────────────────────────────
+        if b.get("wave_amplitude", 0) > 0:
+            b["wave_time"] = b.get("wave_time", 0) + dt
+            wave_freq = b.get("wave_frequency", 1.0)   # oscillations per second
+            amplitude = b["wave_amplitude"]             # perpendicular pixel offset
+
+            # Perpendicular direction (rotate 90°)
+            pdx = -b["dy"]
+            pdy =  b["dx"]
+
+            # Sinusoidal offset delta from last frame to this frame
+            prev_phase = math.sin(wave_freq * (b["wave_time"] - dt) * math.pi * 2)
+            curr_phase = math.sin(wave_freq *  b["wave_time"]       * math.pi * 2)
+            delta_perp = amplitude * (curr_phase - prev_phase)
+
+            b["x"] += b["dx"] * distance_moved + pdx * delta_perp
+            b["y"] += b["dy"] * distance_moved + pdy * delta_perp
+        else:
+            b["x"] += b["dx"] * distance_moved
+            b["y"] += b["dy"] * distance_moved
+
         b["distance_traveled"] += distance_moved
 
         # ── Range check ───────────────────────────────────────────────
@@ -17,7 +46,8 @@ def update_bullets(bullets, players, map_data_module, dt):
             # If explosive, trigger explosion at max range
             if b.get("is_explosive", False):
                 hit_player, armor_absorbed = handle_explosion(
-                    b, players, map_data_module, hit_player, armor_absorbed
+                    b, players, map_data_module, hit_player, armor_absorbed,
+                    explosion_animations
                 )
             if b in bullets:
                 bullets.remove(b)
@@ -52,7 +82,8 @@ def update_bullets(bullets, players, map_data_module, dt):
                     # Regular bullet or max penetration reached - destroy bullet
                     if b.get("is_explosive", False):
                         hit_player, armor_absorbed = handle_explosion(
-                            b, players, map_data_module, hit_player, armor_absorbed
+                            b, players, map_data_module, hit_player, armor_absorbed,
+                            explosion_animations
                         )
                     if b in bullets:
                         bullets.remove(b)
@@ -87,7 +118,8 @@ def update_bullets(bullets, players, map_data_module, dt):
                 # If explosive, handle explosion damage
                 if b.get("is_explosive", False):
                     hit_player, armor_absorbed = handle_explosion(
-                        b, players, map_data_module, hit_player, armor_absorbed
+                        b, players, map_data_module, hit_player, armor_absorbed,
+                        explosion_animations
                     )
                 else:
                     # Regular bullet hit
@@ -136,10 +168,12 @@ def update_bullets(bullets, players, map_data_module, dt):
     return hit_player, armor_absorbed
 
 
-def handle_explosion(bullet, players, map_data_module, current_hit_player, current_armor_absorbed):
+def handle_explosion(bullet, players, map_data_module, current_hit_player, current_armor_absorbed,
+                     explosion_animations=None):
     """
     Handle explosion damage for rocket launcher.
     Damages all players within explosion_radius tiles of the impact point.
+    Spawns an explosion animation entry if explosion_animations list is provided.
     
     Returns updated (hit_player, armor_absorbed) tuple.
     """
@@ -150,6 +184,17 @@ def handle_explosion(bullet, players, map_data_module, current_hit_player, curre
     # Convert bullet position to tile coordinates
     impact_tile_x = (bullet["x"] - map_data_module.offset_x) / map_data_module.TILE_SIZE
     impact_tile_y = (bullet["y"] - map_data_module.offset_y) / map_data_module.TILE_SIZE
+
+    # ── Spawn explosion animation ─────────────────────────────────────────────
+    if explosion_animations is not None:
+        explosion_animations.append({
+            "x":        bullet["x"],
+            "y":        bullet["y"],
+            "start":    pygame.time.get_ticks(),
+            "duration": 500,          # ms – tune as desired
+            "frame":    0,
+            "radius":   explosion_radius * map_data_module.TILE_SIZE,
+        })
     
     hit_player = current_hit_player
     armor_absorbed = current_armor_absorbed
@@ -208,6 +253,19 @@ def handle_explosion(bullet, players, map_data_module, current_hit_player, curre
 
 
 def try_melee(attacker, defender, current_time, active_animations, map_data_module):
+    """
+    Attempt a melee strike from `attacker` toward `defender`.
+
+    Rules
+    -----
+    • Attacker must NOT own a gun (checked in main before calling).
+    • Attacker must have waited MELEE_COOLDOWN ms since last swing.
+    • Defender must be standing on the tile directly in front of attacker.
+    • On success: defender is stunned for MELEE_STUN_DURATION ms.
+    • A hit-spark animation entry is added to active_animations.
+
+    Returns True if a hit landed, False otherwise.
+    """
     from config import MELEE_COOLDOWN, MELEE_STUN_DURATION, MELEE_ANIM_DURATION
 
     # Cooldown gate

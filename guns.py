@@ -23,13 +23,13 @@ GUN_TYPES = {
     },
     "smg": {
         "ammo": 30, "bullet_speed": 400, "cooldown": 80,
-        "damage": 15, "range": 400, "duration": 12000,
+        "damage": 15, "range": 300, "duration": 12000,
         "path": "assets/guns/MP7-PxNBG.png",
         "map_scale": 0.7, "equip_scale": 0.6,
     },
     "sniper": {
         "ammo": 5, "bullet_speed": 800, "cooldown": 1500,
-        "damage": 50, "range": 1000, "duration": 15000,
+        "damage": 50, "range": 1500, "duration": 15000,
         "path": "assets/guns/M82A1-PxNBG.png",
         "map_scale": 0.5, "equip_scale": 0.4,
     },
@@ -37,6 +37,7 @@ GUN_TYPES = {
         "ammo": 3, "bullet_speed": 250, "cooldown": 2000,
         "damage": 75, "range": 500, "duration": 15000,
         "explosion_radius": 3, "is_explosive": True,
+        "spread": 6,   # Pixel amplitude of wave motion for rocket
         "path": "assets/guns/AT4-PxNBG.png",
         "map_scale": 0.55, "equip_scale": 0.38,
     },
@@ -86,13 +87,14 @@ class GunSystem:
     """Represents a single gun pickup / equipped weapon."""
 
     def __init__(self):
-        self.pos         = None
-        self.owner       = None
-        self.type        = None
-        self.ammo        = 0
-        self.last_shot   = 0
-        self.pickup_time = 0
-        self.duration    = 0
+        self.pos            = None
+        self.owner          = None
+        self.type           = None
+        self.ammo           = 0
+        self.last_shot      = 0
+        self.pickup_time    = 0
+        self.duration       = 0
+        self.map_spawn_time = 0   # when this gun appeared on the map floor
 
     def spawn(self, map_data_module, current_time=0, occupied_positions=None):
         """
@@ -119,8 +121,9 @@ class GunSystem:
                 continue
             if any([x, y] == op for op in occupied_positions):
                 continue
-            self.pos  = [x, y]
-            self.type = random.choice(available)
+            self.pos            = [x, y]
+            self.type           = random.choice(available)
+            self.map_spawn_time = current_time
             return True
 
         return False
@@ -159,6 +162,13 @@ def shoot(gun, player, bullets, current_time, map_data_module):
 
     dx, dy = player.dir
 
+    # Apply a random ±3° spread to the rocket's launch direction
+    if gun.type == "rocket_launcher":
+        import math as _math
+        angle_offset = _math.radians(random.uniform(-3, 3))
+        cos_a, sin_a = _math.cos(angle_offset), _math.sin(angle_offset)
+        dx, dy = dx * cos_a - dy * sin_a, dx * sin_a + dy * cos_a
+
     center_x = (map_data_module.offset_x
                 + player.pos[0] * map_data_module.TILE_SIZE
                 + map_data_module.TILE_SIZE / 2)
@@ -185,6 +195,10 @@ def shoot(gun, player, bullets, current_time, map_data_module):
         "max_wall_penetration": 3,  # Sniper can penetrate up to 2 walls
         "last_grid_x": -1,  # Track last grid position to avoid recounting same wall
         "last_grid_y": -1,
+        # Wave pattern for rocket launcher
+        "wave_time": 0,                                                           # Accumulated time for wave oscillation
+        "wave_amplitude": gun_data.get("spread", 0) if gun.type == "rocket_launcher" else 0,
+        "wave_frequency": 3.5 if gun.type == "rocket_launcher" else 0,           # Oscillations per second
     }
 
     if gun.type == "shotgun":
