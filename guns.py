@@ -51,7 +51,7 @@ GUN_COOLDOWNS = {
     "shotgun": 12000,
     "smg":     10000,
     "sniper":  20000,
-    "rocket_launcher": 0,
+    "rocket_launcher": 20000,
 }
 gun_last_used = {"pistol": 0, "rifle": 0, "shotgun": 0, "smg": 0, "sniper": 0, "rocket_launcher": 0}
 
