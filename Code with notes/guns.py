@@ -1,194 +1,238 @@
-# Imports Python's built-in random module to help generate random map coordinates for gun spawns.
 import random
-# Imports the Pygame library, which handles rendering images, transformations, and game loops.
 import pygame
-# Imports your local map_data module so the gun system can check grid layouts and tile sizes.
 import map_data
 
-#slop ni clarence
-
-# A dictionary defining the core stats and asset paths for every gun type in the game.
 GUN_TYPES = {
-    # Pistol: Low ammo, moderate speed, quick cooldown, low damage.
-    "pistol": {"ammo": 8, "bullet_speed": 300, "cooldown": 400, "damage": 1, "range": 300, "duration": 15000, "path": "assets/guns/Glock18c-PxNBG.png", "map_scale": 0.8, "equip_scale": 0.5},
-    # Rifle: High ammo, high bullet speed, very fast firing rate (low cooldown), moderate damage.
-    "rifle": {"ammo": 20, "bullet_speed": 500, "cooldown": 120, "damage": 1.5, "range": 600, "duration": 15000, "path": "assets/guns/M4A1-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4},
-    # Shotgun: Low ammo, slow bullet speed, slow firing rate, fires multiple bullets with spread (defined in shoot function).
-    "shotgun": {"ammo": 5, "bullet_speed": 200, "cooldown": 800, "damage": 0.7, "spread": 0.1, "range": 150, "duration": 15000, "path": "assets/guns/Rem870-Px-PxNBG.png", "map_scale": 0.6, "equip_scale": 0.4}
+    "pistol":  {
+        "ammo": 8,  "bullet_speed": 300, "cooldown": 400,
+        "damage": 15,   "range": 300, "duration": 15000,
+        "path": "assets/guns/Glock18c-PxNBG.png",
+        "map_scale": 0.8, "equip_scale": 0.5,
+    },
+    "rifle":   {
+        "ammo": 20, "bullet_speed": 500, "cooldown": 120,
+        "damage": 30, "range": 600, "duration": 15000,
+        "path": "assets/guns/M4A1-Px-PxNBG.png",
+        "map_scale": 0.6, "equip_scale": 0.4,
+    },
+    "shotgun": {
+        "ammo": 5,  "bullet_speed": 200, "cooldown": 800,
+        "damage": 50, "spread": 8, "range": 150, "duration": 15000,
+        "path": "assets/guns/Rem870-Px-PxNBG.png",
+        "map_scale": 0.5, "equip_scale": 0.4,
+    },
+    "smg": {
+        "ammo": 30, "bullet_speed": 400, "cooldown": 80,
+        "damage": 15, "range": 400, "duration": 12000,
+        "path": "assets/guns/MP7-PxNBG.png",
+        "map_scale": 0.7, "equip_scale": 0.6,
+    },
+    "sniper": {
+        "ammo": 5, "bullet_speed": 800, "cooldown": 1500,
+        "damage": 50, "range": 1000, "duration": 15000,
+        "path": "assets/guns/M82A1-PxNBG.png",
+        "map_scale": 0.5, "equip_scale": 0.4,
+    },
+    "rocket_launcher": {
+        "ammo": 3, "bullet_speed": 250, "cooldown": 2000,
+        "damage": 75, "range": 500, "duration": 15000,
+        "explosion_radius": 3, "is_explosive": True,
+        "path": "assets/guns/AT4-PxNBG.png",
+        "map_scale": 0.55, "equip_scale": 0.38,
+    },
 }
 
-# Defines the global respawn cooldowns (in milliseconds) for each gun type after they are depleted or dropped.
+# Per-type respawn cooldowns (ms) – how long after a gun of this type
+# was last used before it may spawn again.
 GUN_COOLDOWNS = {
-    "pistol": 400,
-    "rifle": 400,
-    "shotgun": 400
+    "pistol":  400,
+    "rifle":   15000,
+    "shotgun": 12000,
+    "smg":     10000,
+    "sniper":  20000,
+    "rocket_launcher": 20000,
 }
+gun_last_used = {"pistol": 0, "rifle": 0, "shotgun": 0, "smg": 0, "sniper": 0, "rocket_launcher": 0}
 
-# A dictionary tracking the exact timestamp (in milliseconds) when each gun was last dropped or emptied.
-gun_last_used = {"pistol": 0, "rifle": 0, "shotgun":0}
 
-# A function that scales the original high-resolution gun images to fit the map's current tile size.
+# ── Image loading ─────────────────────────────────────────────────────────────
+
 def scale_gun_images(tile_size):
-    # Iterates through the values (dictionaries) of every gun defined in GUN_TYPES.
     for gun in GUN_TYPES.values():
-        # A try-except block to gracefully handle missing image files.
         try:
-            # Loads the image from the specified path and converts it to support alpha (transparency).
-            img = pygame.image.load(gun["path"]).convert_alpha()
-            # Calculates the image's aspect ratio to ensure scaling doesn't stretch or squish the gun.
+            img          = pygame.image.load(gun["path"]).convert_alpha()
             aspect_ratio = img.get_width() / img.get_height()
-            
-            # Sets the base bounding box based on the current tile size.
-            base_height = tile_size
-            base_width = int(tile_size * aspect_ratio)
+            base_h       = tile_size
+            base_w       = int(tile_size * aspect_ratio)
 
-            # Calculates the dimensions for when the gun is lying on the floor (map version).
-            map_w = int(base_width * gun.get("map_scale", 1.0))
-            map_h = int(base_height * gun.get("map_scale", 1.0))
-            # Stores the scaled-down map image back into the GUN_TYPES dictionary.
+            map_w = int(base_w * gun.get("map_scale",   1.0))
+            map_h = int(base_h * gun.get("map_scale",   1.0))
             gun["map_image"] = pygame.transform.scale(img, (map_w, map_h))
 
-            # Calculates the dimensions for when the gun is actively held by a player (equipped version).
-            equip_w = int(base_width * gun.get("equip_scale", 1.0))
-            equip_h = int(base_height * gun.get("equip_scale", 1.0))
-            # Stores the scaled-down equipped image back into the GUN_TYPES dictionary.
-            gun["equipped_image"] = pygame.transform.scale(img, (equip_w, equip_h))
+            eq_w = int(base_w * gun.get("equip_scale", 1.0))
+            eq_h = int(base_h * gun.get("equip_scale", 1.0))
+            gun["equipped_image"] = pygame.transform.scale(img, (eq_w, eq_h))
 
-        # Triggers if the image file isn't found or Pygame fails to load it.
         except (FileNotFoundError, pygame.error):
-            # Creates a grey square placeholder for the map image to prevent the game from crashing.
-            gun["map_image"] = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
-            gun["map_image"].fill((100, 100, 100))
-            # Creates a grey square placeholder for the equipped image.
-            gun["equipped_image"] = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
-            gun["equipped_image"].fill((100, 100, 100))
+            fb = pygame.Surface((tile_size, tile_size), pygame.SRCALPHA)
+            fb.fill((100, 100, 100))
+            gun["map_image"]      = fb
+            gun["equipped_image"] = fb
 
-# A class representing the current active gun entity in the game map.
+
+# ── GunSystem ─────────────────────────────────────────────────────────────────
+
 class GunSystem:
-    # Initializes default properties for the gun when the class is instantiated.
+    """Represents a single gun pickup / equipped weapon."""
+
     def __init__(self):
-        self.pos = None         # [x, y] coordinates when dropped on the map.
-        self.owner = None       # Reference to the Player object holding the gun.
-        self.type = None        # String indicating if it's a "pistol", "rifle", etc.
-        self.ammo = 0           # Current ammo count.
-        self.last_shot = 0      # Timestamp of the last time it was fired (for firing rate).
-        self.pickup_time = 0    # Timestamp of when it was picked up (for duration tracking).
-        self.duration = 0       # How long the gun lasts in a player's hands before disappearing.
+        self.pos         = None
+        self.owner       = None
+        self.type        = None
+        self.ammo        = 0
+        self.last_shot   = 0
+        self.pickup_time = 0
+        self.duration    = 0
 
-##================= GUN SPAWN ALGO =================}
+    def spawn(self, map_data_module, current_time=0, occupied_positions=None):
+        """
+        Try to place this gun on the map.
+        `occupied_positions` is a list of [x,y] lists that must be avoided
+        (used so the two guns don't spawn on the same tile).
 
-# Method signature: takes map_data to check the grid, and current_time to check cooldowns
-    def spawn(self, map_data_module, current_time=0):
-        
-        # Use a list comprehension to create a list of gun types (pistol, rifle, shotgun) 
-        # that are currently allowed to spawn. It checks if the time since the gun was last used/dropped 
-        # is greater than or equal to its mandatory respawn cooldown.
+        Returns True on success, False if no valid gun type is available.
+        """
+        occupied_positions = occupied_positions or []
+
         available = [
             t for t in GUN_TYPES
             if current_time - gun_last_used[t] >= GUN_COOLDOWNS[t]
         ]
-        
-        # If the 'available' list is empty (all guns are still on cooldown), return False to abort the spawn
         if not available:
             return False
-        
-        # Start an infinite loop to continually guess random coordinates until an empty tile is found
-        while True:
-            # Pick a random column index (X) anywhere between 0 and the maximum width of the map
+
+        # Try up to 100 random positions to find a free floor tile
+        for _ in range(100):
             x = random.randint(0, map_data_module.MAP_COLS - 1)
-            # Pick a random row index (Y) anywhere between 0 and the maximum height of the map
             y = random.randint(0, map_data_module.MAP_ROWS - 1)
-            
-            # Check the map grid at the guessed Y and X coordinates. 
-            # A value of 0 means the tile is an empty floor (safe to spawn).
-            if map_data_module.map_grid[y][x] == 0:
-                # Update the gun object's internal position list to these valid coordinates
-                self.pos = [x, y]
-                # Randomly pick which type of gun (from the available list) this will be
-                self.type = random.choice(available)
-                # Break the infinite loop because we successfully placed the gun
-                break
+            if map_data_module.map_grid[y][x] != 0:
+                continue
+            if any([x, y] == op for op in occupied_positions):
+                continue
+            self.pos  = [x, y]
+            self.type = random.choice(available)
+            return True
 
+        return False
 
-
-
-##================= GUN PICKUP LOGIC =================}
-    # Handles the logic for when a player steps on the gun to equip it.
     def pickup(self, player, current_time):
-        # Fetches the base stats for this specific gun type.
-        gun_data = GUN_TYPES[self.type]
-        # Assigns the gun's owner to the player who picked it up.
-        self.owner = player
-        # Loads the gun with its designated starting ammo.
-        self.ammo = gun_data["ammo"]
-        # Records the time it was picked up to start the duration timer.
+        gun_data         = GUN_TYPES[self.type]
+        self.owner       = player
+        self.ammo        = gun_data["ammo"]
         self.pickup_time = current_time
-        # Sets the lifespan of the gun (defaults to 15000ms / 15 seconds if missing).
-        self.duration = gun_data.get("duration", 15000)
-        # Removes the gun from the floor since it is now equipped.
-        self.pos = None
+        self.duration    = gun_data.get("duration", 15000)
+        self.pos         = None
 
-# A standalone function to handle generating bullets when a player attempts to shoot.
+    def drop(self, current_time):
+        """Release ownership without respawning; caller handles respawn timer."""
+        gun_last_used[self.type] = current_time
+        self.owner       = None
+        self.pickup_time = None
+
+
+# ── Shooting ──────────────────────────────────────────────────────────────────
+
 def shoot(gun, player, bullets, current_time, map_data_module):
-    # Failsafe: Ensures a player cannot shoot a gun they don't currently own.
     if gun.owner != player:
         return
-    
-    # Checks if the gun has exceeded its maximum hold duration (e.g., 15 seconds).
+
     if gun.pickup_time and (current_time - gun.pickup_time >= gun.duration):
-        # Unassigns the owner, essentially forcing the player to drop it.
-        gun.owner = None
-        gun.pickup_time = None
+        gun.drop(current_time)
         return
-    
-    # Retrieves the specific stats for the gun currently being fired.
+
     gun_data = GUN_TYPES[gun.type]
-    
-    # Prevents firing if the gun is still on cooldown (firing rate limit) or if it's out of ammo.
     if current_time - gun.last_shot < gun_data["cooldown"] or gun.ammo <= 0:
         return
-        
-    # Updates the last shot timestamp to enforce the cooldown for the next shot.
-    gun.last_shot = current_time
-    # Deducts one bullet from the active ammo pool.
-    gun.ammo -= 1
 
-    # Grabs the player's current facing direction (e.g., [1, 0] for right, [0, -1] for up).
+    gun.last_shot  = current_time
+    gun.ammo      -= 1
+
     dx, dy = player.dir
-    
-    # Calculates the exact pixel X coordinate of the player's center.
-    center_x = map_data_module.offset_x + player.pos[0] * map_data_module.TILE_SIZE + map_data_module.TILE_SIZE / 2
-    # Calculates the exact pixel Y coordinate of the player's center.
-    center_y = map_data_module.offset_y + player.pos[1] * map_data_module.TILE_SIZE + map_data_module.TILE_SIZE / 2
-    
-    # Shifts the bullet spawn point outwards in the direction the player is facing (acting as a "barrel").
-    # This prevents the bullet from spawning directly inside the player and instantly colliding.
-    spawn_x = center_x + (dx * (map_data_module.TILE_SIZE / 1.5))
-    spawn_y = center_y + (dy * (map_data_module.TILE_SIZE / 1.5))
 
-    # Special firing logic for the shotgun, which fires a spread of pellets.
+    center_x = (map_data_module.offset_x
+                + player.pos[0] * map_data_module.TILE_SIZE
+                + map_data_module.TILE_SIZE / 2)
+    center_y = (map_data_module.offset_y
+                + player.pos[1] * map_data_module.TILE_SIZE
+                + map_data_module.TILE_SIZE / 2)
+
+    spawn_x = center_x + dx * (map_data_module.TILE_SIZE / 1.5)
+    spawn_y = center_y + dy * (map_data_module.TILE_SIZE / 1.5)
+
+    base_bullet = {
+        "x": spawn_x, "y": spawn_y,
+        "dx": dx, "dy": dy,
+        "speed": gun_data["bullet_speed"],
+        "damage": gun_data["damage"],
+        "original_damage": gun_data["damage"],  # Store original damage for penetration calculations
+        "max_range": gun_data["range"],
+        "distance_traveled": 0,
+        "owner": player,
+        "is_explosive": gun_data.get("is_explosive", False),
+        "explosion_radius": gun_data.get("explosion_radius", 0),
+        "can_penetrate": gun.type == "sniper",  # Only sniper can penetrate
+        "walls_penetrated": 0,  # Track how many walls penetrated
+        "max_wall_penetration": 3,  # Sniper can penetrate up to 2 walls
+        "last_grid_x": -1,  # Track last grid position to avoid recounting same wall
+        "last_grid_y": -1,
+    }
+
     if gun.type == "shotgun":
-        # Loops 3 times (-1, 0, 1) to create left, center, and right spread bullets.
+        perp_dx = -dy
+        perp_dy =  dx
         for i in range(-1, 2):
-            # Calculates the perpendicular vector (90 degrees) to the player's aiming direction.
-            perp_dx = -dy
-            perp_dy = dx
-            # Appends a new dictionary representing a shotgun pellet into the global bullets list.
-            bullets.append({
-                "x": spawn_x, "y": spawn_y,
-                # Mixes the forward vector (dx) with a fraction of the perpendicular vector (perp_dx) based on 'i'.
-                "dx": dx + i * 0.3 * perp_dx, "dy": dy + i * 0.3 * perp_dy,
-                "speed": gun_data["bullet_speed"], "damage": gun_data["damage"],
-                "max_range": gun_data["range"], "distance_traveled": 0,
-                "owner": player # Identifies the shooter to prevent self-damage.
-            })
-    # Standard firing logic for single-projectile weapons like pistols and rifles.
+            b = dict(base_bullet)
+            b["dx"] = dx + i * 0.3 * perp_dx
+            b["dy"] = dy + i * 0.3 * perp_dy
+            bullets.append(b)
     else:
-        # Appends a single dictionary representing a standard bullet into the global bullets list.
-        bullets.append({
-            "x": spawn_x, "y": spawn_y,
-            "dx": dx, "dy": dy, # Travels straight in the exact direction the player is facing.
-            "speed": gun_data["bullet_speed"], "damage": gun_data["damage"],
-            "max_range": gun_data["range"], "distance_traveled": 0,
-            "owner": player # Identifies the shooter to prevent self-damage.
-        })
+        bullets.append(base_bullet)
+
+
+# ── Armor pickup ──────────────────────────────────────────────────────────────
+
+class ArmorPickup:
+    """
+    A single armor-pickup token that sits on the map until collected or despawned.
+    """
+
+    def __init__(self):
+        self.pos          = None   # [x, y] tile or None
+        self.spawn_time   = 0      # when it appeared
+        self.despawn_time = 0      # when it should vanish
+
+    def spawn(self, map_data_module, current_time, occupied_positions=None):
+        """
+        Place the armor token on a random free floor tile.
+        `occupied_positions` – list of [x,y] to avoid (guns, other items).
+        Returns True on success.
+        """
+        from config import ARMOR_DESPAWN_TIME
+        occupied_positions = occupied_positions or []
+
+        for _ in range(100):
+            x = random.randint(0, map_data_module.MAP_COLS - 1)
+            y = random.randint(0, map_data_module.MAP_ROWS - 1)
+            if map_data_module.map_grid[y][x] != 0:
+                continue
+            if any([x, y] == op for op in occupied_positions):
+                continue
+            self.pos          = [x, y]
+            self.spawn_time   = current_time
+            self.despawn_time = current_time + ARMOR_DESPAWN_TIME
+            return True
+
+        return False
+
+    def clear(self):
+        self.pos = None

@@ -1,78 +1,245 @@
 import pygame
+from guns import GUN_TYPES
 
-# Function definition: takes the list of bullets, list of players, map data, and delta time (dt)
+
 def update_bullets(bullets, players, map_data_module, dt):
-    # Initialize a variable to track if a player was hit this frame; defaults to None
-    hit_player = None  
-    
-    # Iterate over a *copy* of the bullets list (using [:]) so we can safely remove items from the original list during the loop
+    hit_player     = None
+    armor_absorbed = False
+
     for b in bullets[:]:
-        
-        # Calculate exactly how many pixels the bullet should move this frame based on its speed and the time passed (dt)
         distance_moved = float(b["speed"]) * float(dt)
-        
-        # Update the bullet's exact X pixel coordinate by multiplying its X direction vector by the distance
         b["x"] += b["dx"] * distance_moved
-        # Update the bullet's exact Y pixel coordinate by multiplying its Y direction vector by the distance
         b["y"] += b["dy"] * distance_moved
-        # Add the distance moved this frame to the total distance this specific bullet has traveled
         b["distance_traveled"] += distance_moved
 
-        # --- 1. Range Exhaustion ---
-        # Check if the bullet has traveled further than its weapon's maximum allowed range
+        # ── Range check ───────────────────────────────────────────────
         if b["distance_traveled"] >= b["max_range"]:
-            # Double-check the bullet is still in the list to prevent ValueError, then remove it
+            # If explosive, trigger explosion at max range
+            if b.get("is_explosive", False):
+                hit_player, armor_absorbed = handle_explosion(
+                    b, players, map_data_module, hit_player, armor_absorbed
+                )
             if b in bullets:
                 bullets.remove(b)
-            # Skip the rest of the loop for this bullet since it no longer exists
             continue
 
-        # Convert the bullet's exact pixel X coordinate into a map grid column index
+        # ── Wall collision ────────────────────────────────────────────
         grid_x = int((b["x"] - map_data_module.offset_x) // map_data_module.TILE_SIZE)
-        # Convert the bullet's exact pixel Y coordinate into a map grid row index
         grid_y = int((b["y"] - map_data_module.offset_y) // map_data_module.TILE_SIZE)
 
-        # --- 2. Wall/Bounds Collision ---
-        # Check if the bullet is out of bounds on the left/right (grid_x) OR top/bottom (grid_y)
-        # OR if the specific tile the bullet is currently over is a wall (value of 1 in map_grid)
-        if (grid_x < 0 or grid_x >= map_data_module.MAP_COLS or 
-            grid_y < 0 or grid_y >= map_data_module.MAP_ROWS or 
-            map_data_module.map_grid[grid_y][grid_x] == 1):
-            
-            # If it hit a wall or went out of bounds, remove it from the game
-            if b in bullets:
-                bullets.remove(b)
-            # Skip to the next bullet
-            continue
-
-        # --- 3. Player Collision ---
-        # Loop through all players in the game (Player 1 and Player 2)
-        for p in players:
-            # Check to ensure the bullet cannot damage the person who fired it
-            if p != b["owner"]:
-                # Create a pygame.Rect representing the player's current physical hit box on the screen
-                p_rect = pygame.Rect(
-                    map_data_module.offset_x + p.pos[0] * map_data_module.TILE_SIZE,
-                    map_data_module.offset_y + p.pos[1] * map_data_module.TILE_SIZE,
-                    map_data_module.TILE_SIZE, map_data_module.TILE_SIZE
-                )
+        if (
+            0 <= grid_y < len(map_data_module.map_grid)
+            and 0 <= grid_x < len(map_data_module.map_grid[0])
+        ):
+            if map_data_module.map_grid[grid_y][grid_x] == 1:
+                # Check if this is a NEW wall tile (not the same one as last frame)
+                is_new_wall = (grid_x != b.get("last_grid_x", -1) or grid_y != b.get("last_grid_y", -1))
                 
-                # Check if the bullet's current pixel coordinates (x, y) overlap with the player's hit box
-                if p_rect.collidepoint(b["x"], b["y"]):
-                    # Deduct the bullet's damage from the player's health points
-                    p.hp -= b["damage"]
-                    # Mark that this specific player was hit
-                    hit_player = p  
-                    # Remove the bullet from the game since it struck a target
+                # Wall hit - check if bullet can penetrate
+                if b.get("can_penetrate", False) and b.get("walls_penetrated", 0) < b.get("max_wall_penetration", 0):
+                    # Only increment wall count if this is a new wall tile
+                    if is_new_wall:
+                        b["walls_penetrated"] += 1
+                        # Reduce damage by 20% of ORIGINAL damage per wall
+                        damage_reduction = b["original_damage"] * 0.2
+                        b["damage"] = b["original_damage"] - (damage_reduction * b["walls_penetrated"])
+                    
+                    # Update last grid position
+                    b["last_grid_x"] = grid_x
+                    b["last_grid_y"] = grid_y
+                    # Continue bullet flight - don't remove it
+                else:
+                    # Regular bullet or max penetration reached - destroy bullet
+                    if b.get("is_explosive", False):
+                        hit_player, armor_absorbed = handle_explosion(
+                            b, players, map_data_module, hit_player, armor_absorbed
+                        )
                     if b in bullets:
                         bullets.remove(b)
-                    # Break out of the player-checking loop since the bullet is destroyed
-                    break
-        
-        # If a player was hit by this bullet, break the main bullet loop entirely.
-        # This clears remaining checks this frame, preventing simultaneous/double damage bugs
-        if hit_player:
-            break
+                    continue
+            else:
+                # Not in a wall - update grid position tracking
+                b["last_grid_x"] = grid_x
+                b["last_grid_y"] = grid_y
+        else:
+            if b in bullets:
+                bullets.remove(b)
+            continue
 
-    # Return the player who was hit (if any) to main.py so it can handle respawns and resetting the round
-    return hit_player
+        # ── Player collision ──────────────────────────────────────────
+        bullet_rect = pygame.Rect(int(b["x"]) - 4, int(b["y"]) - 4, 8, 8)
+
+        for p in players:
+            if p == b["owner"]:
+                continue
+
+            player_rect = pygame.Rect(
+                int(map_data_module.offset_x + p.pos[0] * map_data_module.TILE_SIZE),
+                int(map_data_module.offset_y + p.pos[1] * map_data_module.TILE_SIZE),
+                map_data_module.TILE_SIZE,
+                map_data_module.TILE_SIZE,
+            )
+
+            if bullet_rect.colliderect(player_rect):
+                # Determine how much damage this specific bullet does
+                # We use .get() as a safety measure in case 'damage' isn't defined
+                bullet_damage = b.get("damage", 1) 
+                # If explosive, handle explosion damage
+                if b.get("is_explosive", False):
+                    hit_player, armor_absorbed = handle_explosion(
+                        b, players, map_data_module, hit_player, armor_absorbed
+                    )
+                else:
+                    # Regular bullet hit
+                    # ── Armor Logic ──────────────────────────────────────────
+                    # New system: each armor has 33.33 HP
+                    ARMOR_HP_PER_UNIT = 33.33
+                    
+                    if p.armor > 0:
+                        # Armor absorbs damage first
+                        p.armor_hp -= bullet_damage
+                        
+                        # Check if armor units need to be reduced
+                        while p.armor_hp < 0 and p.armor > 0:
+                            p.armor -= 1
+                            if p.armor > 0:
+                                p.armor_hp += ARMOR_HP_PER_UNIT
+                            else:
+                                # All armor broken, overflow damage goes to HP
+                                p.hp += p.armor_hp  # armor_hp is negative, so this reduces HP
+                                p.armor_hp = 0
+                        
+                        # Cap armor_hp to current armor max
+                        if p.armor > 0:
+                            max_armor_hp = p.armor * ARMOR_HP_PER_UNIT
+                            if p.armor_hp > max_armor_hp:
+                                p.armor_hp = max_armor_hp
+                        
+                        if p.hp < 0:
+                            p.hp = 0
+                        
+                        # Player respawns if all armor AND hp are depleted
+                        armor_absorbed = (p.hp > 0)
+                    else:
+                        # No armor: reduce HP by the weapon's specific damage value
+                        p.hp -= bullet_damage
+                        if p.hp < 0:
+                            p.hp = 0
+                        armor_absorbed = False
+
+                    hit_player = p
+
+                if b in bullets:
+                    bullets.remove(b)
+                break
+
+    return hit_player, armor_absorbed
+
+
+def handle_explosion(bullet, players, map_data_module, current_hit_player, current_armor_absorbed):
+    """
+    Handle explosion damage for rocket launcher.
+    Damages all players within explosion_radius tiles of the impact point.
+    
+    Returns updated (hit_player, armor_absorbed) tuple.
+    """
+    explosion_radius = bullet.get("explosion_radius", 0)
+    if explosion_radius <= 0:
+        return current_hit_player, current_armor_absorbed
+    
+    # Convert bullet position to tile coordinates
+    impact_tile_x = (bullet["x"] - map_data_module.offset_x) / map_data_module.TILE_SIZE
+    impact_tile_y = (bullet["y"] - map_data_module.offset_y) / map_data_module.TILE_SIZE
+    
+    hit_player = current_hit_player
+    armor_absorbed = current_armor_absorbed
+    
+    for p in players:
+        if p == bullet["owner"]:
+            continue
+        
+        # Calculate distance in tiles
+        dx = p.pos[0] - impact_tile_x
+        dy = p.pos[1] - impact_tile_y
+        distance = (dx * dx + dy * dy) ** 0.5
+
+        boomer_damage = bullet.get("damage", 50)
+
+        if distance <= explosion_radius:
+            # Apply explosion damage
+            # New system: each armor has 33.33 HP
+            ARMOR_HP_PER_UNIT = 33.33
+            
+            if p.armor > 0:
+                # Armor absorbs damage first
+                p.armor_hp -= boomer_damage
+                
+                # Check if armor units need to be reduced
+                while p.armor_hp < 0 and p.armor > 0:
+                    p.armor -= 1
+                    if p.armor > 0:
+                        p.armor_hp += ARMOR_HP_PER_UNIT
+                    else:
+                        # All armor broken, overflow damage goes to HP
+                        p.hp += p.armor_hp  # armor_hp is negative, so this reduces HP
+                        p.armor_hp = 0
+                
+                # Cap armor_hp to current armor max
+                if p.armor > 0:
+                    max_armor_hp = p.armor * ARMOR_HP_PER_UNIT
+                    if p.armor_hp > max_armor_hp:
+                        p.armor_hp = max_armor_hp
+                
+                if p.hp < 0:
+                    p.hp = 0
+                
+                # Player respawns if all armor AND hp are depleted
+                armor_absorbed = (p.hp > 0)
+            else:
+                # No armor: reduce HP by explosion damage
+                p.hp -= boomer_damage
+                if p.hp < 0:
+                    p.hp = 0
+                armor_absorbed = False
+            
+            hit_player = p
+    
+    return hit_player, armor_absorbed
+
+
+def try_melee(attacker, defender, current_time, active_animations, map_data_module):
+    from config import MELEE_COOLDOWN, MELEE_STUN_DURATION, MELEE_ANIM_DURATION
+
+    # Cooldown gate
+    if current_time - attacker.last_melee < MELEE_COOLDOWN:
+        return False
+
+    attacker.last_melee = current_time
+
+    # Check adjacency: target tile in facing direction
+    target_x = attacker.pos[0] + attacker.dir[0]
+    target_y = attacker.pos[1] + attacker.dir[1]
+
+    if [target_x, target_y] != defender.pos:
+        return False
+
+    # Apply stun
+    defender.stunned_until = current_time + MELEE_STUN_DURATION
+
+    # Register animation at the target tile's pixel centre
+    anim_cx = (map_data_module.offset_x
+               + target_x * map_data_module.TILE_SIZE
+               + map_data_module.TILE_SIZE // 2)
+    anim_cy = (map_data_module.offset_y
+               + target_y * map_data_module.TILE_SIZE
+               + map_data_module.TILE_SIZE // 2)
+
+    active_animations.append({
+        "cx":        anim_cx,
+        "cy":        anim_cy,
+        "start":     current_time,
+        "duration":  MELEE_ANIM_DURATION,
+        "frame":     0,
+    })
+
+    return True
