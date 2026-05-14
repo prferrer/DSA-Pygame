@@ -108,6 +108,18 @@ _SPAWNS = {
     },
 }
 
+TELEPORT_HOLES = {
+    "Meadow Crossing": [
+        [16, 6],
+        [35, 11],
+        [30, 19],
+        [16, 23],
+    ]
+}
+
+def get_teleport_holes():
+    return TELEPORT_HOLES.get(_current_map_name, [])
+
 _current_map_name = "The Underkeep"  # tracks which map is active
 
 # Will be set by init_map()

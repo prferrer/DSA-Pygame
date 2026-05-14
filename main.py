@@ -1,4 +1,5 @@
 import pygame
+pygame.mixer.pre_init(44100, -16, 2, 512)
 import sys
 import random
 import math
@@ -8,10 +9,12 @@ from menu import run_menu
 from config import *
 import map_data as md
 from players import Player
-from guns import GUN_TYPES, GunSystem, ArmorPickup, shoot, scale_gun_images
+from guns import GUN_TYPES, GunSystem, ArmorPickup, shoot, scale_gun_images, load_gun_sounds, play_explosion_sound
 from mechanics import update_bullets, try_melee
 
+pygame.mixer.pre_init(44100, -16, 2, 512)
 pygame.init()
+pygame.mixer.init()
 
 # ── Screen initialisation ─────────────────────────────────────────────────────
 info   = pygame.display.Info()
@@ -28,11 +31,12 @@ if menu_result is None:
     pygame.quit()
     sys.exit()
 
-p1_name, p1_color, p1_hat, p2_name, p2_color, p2_hat, selected_map_name = menu_result
+p1_name, p1_color, p1_hat, p2_name, p2_color, p2_hat, selected_map_name = menu_result 
 
 md.init_map(selected_map_name)
 
 scale_gun_images(md.map_data.TILE_SIZE)
+load_gun_sounds()
 
 HUD_FONT = pygame.font.SysFont(None, 36)
 BIG_FONT = pygame.font.SysFont(None, 72)
@@ -111,6 +115,19 @@ try:
     ARMOR_ICON = pygame.image.load("assets/health/armor.png").convert_alpha()
 except Exception:
     ARMOR_ICON = None
+    
+def _load_sound(path):
+    if os.path.isfile(path):
+        try:
+            return pygame.mixer.Sound(path)
+        except Exception:
+            return None
+    return None
+
+SFX_SPEED = _load_sound("assets/SE/speed.mp3")
+SFX_SLOW  = _load_sound("assets/SE/slow.mp3")
+SFX_ARMOR = _load_sound("assets/SE/armor.mp3")
+SFX_TP = _load_sound("assets/SE/teleport.mp3")
 
 # Melee hit-spark frames Hit1.png … Hit5.png
 MELEE_FRAMES = []
@@ -183,6 +200,10 @@ speed_boost_p1     = None
 speed_boost_p2     = None
 slow_p1            = None
 slow_p2            = None
+
+TELEPORT_COOLDOWN = 3000  # ms before same player can teleport again
+player1_last_teleport = 0
+player2_last_teleport = 0
 
 SPEED_BOOST_DURATION = 2000
 SLOW_DURATION        = 2000
@@ -688,6 +709,7 @@ while True:
                     if player.armor_hp < 100:
                         player.armor_hp = min(100, player.armor_hp + 33.33)
                         player.armor = min(3, max(0, math.ceil(player.armor_hp / 33.33)))
+                        if SFX_ARMOR: SFX_ARMOR.play()
                         armor_pickup.clear()
                         last_armor_spawn_time = current_time
                     break
@@ -727,18 +749,38 @@ while True:
             elif player2.hp > player1.hp: winner_text = p2_name
             else:                          winner_text = "Nobody"
 
+        # Teleport holes (Meadow Crossing)
+        holes = md.get_teleport_holes()
+        if holes:
+            for player, last_tp_attr in ((player1, 'player1_last_teleport'), (player2, 'player2_last_teleport')):
+                last_tp = globals()[last_tp_attr]
+                if current_time - last_tp >= TELEPORT_COOLDOWN:
+                    for hx, hy in holes:
+                        if player.pos == [hx, hy]:
+                            # Pick a random OTHER hole
+                            other_holes = [h for h in holes if h != [hx, hy]]
+                            dest = random.choice(other_holes)
+                            player.pos = list(dest)
+                            globals()[last_tp_attr] = current_time
+                            if SFX_TP: SFX_TP.play()
+                            break
+
         # Speed/slow powerup collection
         if green_powerup and player1.pos == green_powerup:
             speed_boost_p1 = current_time + SPEED_BOOST_DURATION
+            if SFX_SPEED: SFX_SPEED.play()
             green_powerup  = None; green_spawn_time = current_time + POWERUP_RESPAWN
         if blue_powerup and player1.pos == blue_powerup:
             slow_p2        = current_time + SLOW_DURATION
+            if SFX_SLOW: SFX_SLOW.play()
             blue_powerup   = None; blue_spawn_time  = current_time + POWERUP_RESPAWN
         if green_powerup and player2.pos == green_powerup:
             speed_boost_p2 = current_time + SPEED_BOOST_DURATION
+            if SFX_SPEED: SFX_SPEED.play()
             green_powerup  = None; green_spawn_time = current_time + POWERUP_RESPAWN
         if blue_powerup and player2.pos == blue_powerup:
             slow_p1        = current_time + SLOW_DURATION
+            if SFX_SLOW: SFX_SLOW.play()
             blue_powerup   = None; blue_spawn_time  = current_time + POWERUP_RESPAWN
 
     # ─────────────────────────────────────────────────────────────────────────

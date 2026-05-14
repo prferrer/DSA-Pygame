@@ -29,3 +29,7 @@ MELEE_ANIM_DURATION = 400    # ms for the hit-spark animation to play
 ARMOR_RESPAWN_TIME  = 5000   # ms between armor pickups appearing
 ARMOR_DESPAWN_TIME  = 12000  # ms an armor pickup stays on the map before vanishing
 ARMOR_MAX_STACK     = 3      # maximum armor points a player can carry
+
+TELEPORT_COOLDOWN = 3000  # ms before same player can teleport again
+player1_last_teleport = 0
+player2_last_teleport = 0

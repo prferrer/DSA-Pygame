@@ -191,10 +191,12 @@ def handle_explosion(bullet, players, map_data_module, current_hit_player, curre
             "x":        bullet["x"],
             "y":        bullet["y"],
             "start":    pygame.time.get_ticks(),
-            "duration": 500,          # ms – tune as desired
+            "duration": 500,
             "frame":    0,
             "radius":   explosion_radius * map_data_module.TILE_SIZE,
         })
+        from guns import play_explosion_sound
+        play_explosion_sound()
     
     hit_player = current_hit_player
     armor_absorbed = current_armor_absorbed

@@ -2,6 +2,41 @@ import random
 import pygame
 import map_data
 
+import os as _os
+
+_SFX_PATHS = {
+    "pistol":           "assets/SE/pistol.mp3",
+    "rifle":            "assets/SE/rifle.mp3",
+    "shotgun":          "assets/SE/shotgun.mp3",
+    "smg":              "assets/SE/smg.mp3",
+    "sniper":           "assets/SE/sniper.mp3",
+    "rocket_fire":      "assets/SE/rocket.mp3",
+    "rocket_explode":   "assets/SE/rocket_explode.mp3",
+}
+
+GUN_SOUNDS = {}
+
+def load_gun_sounds():
+    for key, path in _SFX_PATHS.items():
+        if _os.path.isfile(path):
+            try:
+                GUN_SOUNDS[key] = pygame.mixer.Sound(path)
+            except Exception:
+                GUN_SOUNDS[key] = None
+        else:
+            GUN_SOUNDS[key] = None
+
+def play_gun_sound(gun_type):
+    key = "rocket_fire" if gun_type == "rocket_launcher" else gun_type
+    sfx = GUN_SOUNDS.get(key)
+    if sfx:
+        sfx.play()
+
+def play_explosion_sound():
+    sfx = GUN_SOUNDS.get("rocket_explode")
+    if sfx:
+        sfx.play()
+
 GUN_TYPES = {
     "pistol":  {
         "ammo": 8,  "bullet_speed": 300, "cooldown": 400,
@@ -159,6 +194,7 @@ def shoot(gun, player, bullets, current_time, map_data_module):
 
     gun.last_shot  = current_time
     gun.ammo      -= 1
+    play_gun_sound(gun.type)
 
     dx, dy = player.dir
 

@@ -355,7 +355,8 @@ def draw_player_hat(surface, player, hat_name):
     px = md.map_data.offset_x + player.pos[0] * ts
     py = md.map_data.offset_y + player.pos[1] * ts
     surface.blit(scaled, (px + (ts - hat_w) // 2, py - int(hat_h * 0.80)))
-
+    
+    
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RESET HELPERS
