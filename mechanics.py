@@ -40,14 +40,35 @@ def update_bullets(bullets, players, map_data_module, dt):
             and 0 <= grid_x < len(map_data_module.map_grid[0])
         ):
             if map_data_module.map_grid[grid_y][grid_x] == 1:
-                # If explosive, trigger explosion at wall
-                if b.get("is_explosive", False):
-                    hit_player, armor_absorbed = handle_explosion(
-                        b, players, map_data_module, hit_player, armor_absorbed
-                    )
-                if b in bullets:
-                    bullets.remove(b)
-                continue
+                # Check if this is a NEW wall tile (not the same one as last frame)
+                is_new_wall = (grid_x != b.get("last_grid_x", -1) or grid_y != b.get("last_grid_y", -1))
+                
+                # Wall hit - check if bullet can penetrate
+                if b.get("can_penetrate", False) and b.get("walls_penetrated", 0) < b.get("max_wall_penetration", 0):
+                    # Only increment wall count if this is a new wall tile
+                    if is_new_wall:
+                        b["walls_penetrated"] += 1
+                        # Reduce damage by 20% of ORIGINAL damage per wall
+                        damage_reduction = b["original_damage"] * 0.2
+                        b["damage"] = b["original_damage"] - (damage_reduction * b["walls_penetrated"])
+                    
+                    # Update last grid position
+                    b["last_grid_x"] = grid_x
+                    b["last_grid_y"] = grid_y
+                    # Continue bullet flight - don't remove it
+                else:
+                    # Regular bullet or max penetration reached - destroy bullet
+                    if b.get("is_explosive", False):
+                        hit_player, armor_absorbed = handle_explosion(
+                            b, players, map_data_module, hit_player, armor_absorbed
+                        )
+                    if b in bullets:
+                        bullets.remove(b)
+                    continue
+            else:
+                # Not in a wall - update grid position tracking
+                b["last_grid_x"] = grid_x
+                b["last_grid_y"] = grid_y
         else:
             if b in bullets:
                 bullets.remove(b)
@@ -79,18 +100,34 @@ def update_bullets(bullets, players, map_data_module, dt):
                 else:
                     # Regular bullet hit
                     # ── Armor Logic ──────────────────────────────────────────
+                    # New system: each armor has 33.33 HP
+                    ARMOR_HP_PER_UNIT = 33.33
+                    
                     if p.armor > 0:
                         # Armor absorbs damage first
-                        p.armor -= bullet_damage
-                        if p.armor <= 0:
-                            # Armor broken, overflow damage goes to HP
-                            p.hp += p.armor  # p.armor is negative here, so this reduces HP
-                            p.armor = 0
-                            if p.hp < 0:
-                                p.hp = 0
-                            armor_absorbed = False  # Armor broke, player respawns
-                        else:
-                            armor_absorbed = True  # Armor absorbed the hit
+                        p.armor_hp -= bullet_damage
+                        
+                        # Check if armor units need to be reduced
+                        while p.armor_hp < 0 and p.armor > 0:
+                            p.armor -= 1
+                            if p.armor > 0:
+                                p.armor_hp += ARMOR_HP_PER_UNIT
+                            else:
+                                # All armor broken, overflow damage goes to HP
+                                p.hp += p.armor_hp  # armor_hp is negative, so this reduces HP
+                                p.armor_hp = 0
+                        
+                        # Cap armor_hp to current armor max
+                        if p.armor > 0:
+                            max_armor_hp = p.armor * ARMOR_HP_PER_UNIT
+                            if p.armor_hp > max_armor_hp:
+                                p.armor_hp = max_armor_hp
+                        
+                        if p.hp < 0:
+                            p.hp = 0
+                        
+                        # Player respawns if all armor AND hp are depleted
+                        armor_absorbed = (p.hp > 0)
                     else:
                         # No armor: reduce HP by the weapon's specific damage value
                         p.hp -= bullet_damage
@@ -138,18 +175,34 @@ def handle_explosion(bullet, players, map_data_module, current_hit_player, curre
 
         if distance <= explosion_radius:
             # Apply explosion damage
+            # New system: each armor has 33.33 HP
+            ARMOR_HP_PER_UNIT = 33.33
+            
             if p.armor > 0:
                 # Armor absorbs damage first
-                p.armor -= boomer_damage
-                if p.armor <= 0:
-                    # Armor broken, overflow damage goes to HP
-                    p.hp += p.armor  # p.armor is negative here, so this reduces HP
-                    p.armor = 0
-                    if p.hp < 0:
-                        p.hp = 0
-                    armor_absorbed = False  # Armor broke, player respawns
-                else:
-                    armor_absorbed = True  # Armor absorbed the hit
+                p.armor_hp -= boomer_damage
+                
+                # Check if armor units need to be reduced
+                while p.armor_hp < 0 and p.armor > 0:
+                    p.armor -= 1
+                    if p.armor > 0:
+                        p.armor_hp += ARMOR_HP_PER_UNIT
+                    else:
+                        # All armor broken, overflow damage goes to HP
+                        p.hp += p.armor_hp  # armor_hp is negative, so this reduces HP
+                        p.armor_hp = 0
+                
+                # Cap armor_hp to current armor max
+                if p.armor > 0:
+                    max_armor_hp = p.armor * ARMOR_HP_PER_UNIT
+                    if p.armor_hp > max_armor_hp:
+                        p.armor_hp = max_armor_hp
+                
+                if p.hp < 0:
+                    p.hp = 0
+                
+                # Player respawns if all armor AND hp are depleted
+                armor_absorbed = (p.hp > 0)
             else:
                 # No armor: reduce HP by explosion damage
                 p.hp -= boomer_damage
