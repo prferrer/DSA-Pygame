@@ -54,14 +54,20 @@ player1.armor_hp = 0
 player2.armor_hp = 0
 
 # ── Dual guns ─────────────────────────────────────────────────────────────────
-gun1 = GunSystem()
-gun2 = GunSystem()
-gun1.spawn(md.map_data)
-gun2.spawn(md.map_data, occupied_positions=[gun1.pos] if gun1.pos else [])
+GUN_RESPAWN_TIME = 1000
+NUM_MAP_GUNS     = 3
+map_guns         = [GunSystem() for _ in range(NUM_MAP_GUNS)]
+gun_respawn_timers = [pygame.time.get_ticks()] * NUM_MAP_GUNS
 
-GUN_RESPAWN_TIME     = 1000
-last_gun1_spawn_time = pygame.time.get_ticks()
-last_gun2_spawn_time = pygame.time.get_ticks()
+def _get_occupied():
+    occ = [list(g.pos) for g in map_guns if g.pos]
+    if armor_pickup.pos:
+        occ.append(list(armor_pickup.pos))
+    return occ
+
+_now = pygame.time.get_ticks()
+for _i, _g in enumerate(map_guns):
+    _g.spawn(md.map_data, _now, occupied_positions=[list(g.pos) for g in map_guns[:_i] if g.pos])
 
 bullets = []
 
@@ -330,14 +336,12 @@ def draw_held_gun(surface, gun, player, map_data_module):
     ))
 
 
-def draw_weapon_ui(surface, g1, g2, player, x, y):
-    label = None
-    if g1.owner == player:
-        label = f"{g1.type.upper()} | Ammo: {g1.ammo}"
-    elif g2.owner == player:
-        label = f"{g2.type.upper()} | Ammo: {g2.ammo}"
-    else:
-        label = "No Weapon  [Melee ready]"
+def draw_weapon_ui(surface, guns, player, x, y):
+    label = "No Weapon  [Melee ready]"
+    for g in guns:
+        if g.owner == player:
+            label = f"{g.type.upper()} | Ammo: {g.ammo}"
+            break
     surface.blit(HUD_FONT.render(label, True, (255, 255, 255)), (x, y))
 
 
@@ -538,23 +542,23 @@ def draw_pet(surface, player, pet_name):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _occupied_positions():
-    occ = []
-    if gun1.pos:         occ.append(list(gun1.pos))
-    if gun2.pos:         occ.append(list(gun2.pos))
-    if armor_pickup.pos: occ.append(list(armor_pickup.pos))
+    occ = [list(g.pos) for g in map_guns if g.pos]
+    if armor_pickup.pos:
+        occ.append(list(armor_pickup.pos))
     return occ
 
 
-def _drop_gun(gun, current_time):
+def _drop_gun(gun, slot_index, current_time):
     if gun.type:
         gun.drop(current_time)
     gun.pos  = None
     gun.ammo = 0
+    gun_respawn_timers[slot_index] = current_time
 
 
 def reset_round():
     global bullets, green_powerup, blue_powerup, active_animations, explosion_animations
-    global last_gun1_spawn_time, last_gun2_spawn_time, last_armor_spawn_time
+    global last_armor_spawn_time
 
     bullets.clear()
     active_animations.clear()
@@ -569,12 +573,11 @@ def reset_round():
     player1.stunned_until = 0
     player2.stunned_until = 0
 
-    _drop_gun(gun1, now)
-    _drop_gun(gun2, now)
-    gun1.spawn(md.map_data, now)
-    gun2.spawn(md.map_data, now, occupied_positions=[gun1.pos] if gun1.pos else [])
-    last_gun1_spawn_time = now
-    last_gun2_spawn_time = now
+    for i, g in enumerate(map_guns):
+        _drop_gun(g, i, now)
+    for i, g in enumerate(map_guns):
+        g.spawn(md.map_data, now, occupied_positions=[list(og.pos) for og in map_guns[:i] if og.pos])
+        gun_respawn_timers[i] = now
 
     armor_pickup.clear()
     armor_pickup.spawn(md.map_data, now)
@@ -661,9 +664,9 @@ while True:
             if current_time - last_shrink_time >= SHRINK_INTERVAL:
                 last_shrink_time = current_time
                 md.shrink_map([player1, player2])
-                for g in (gun1, gun2):
+                for i, g in enumerate(map_guns):
                     if g.pos and md.map_grid[g.pos[1]][g.pos[0]] == 1:
-                        _drop_gun(g, current_time)
+                        _drop_gun(g, i, current_time)
                 if (armor_pickup.pos
                         and md.map_grid[armor_pickup.pos[1]][armor_pickup.pos[0]] == 1):
                     armor_pickup.clear()
@@ -702,17 +705,17 @@ while True:
             if keys[pygame.K_RIGHT]: player2.move(1,  0, md.map_data, current_time, p2_delay)
 
         # ── Shoot (held key) OR melee (single press) — context-sensitive ────────
-        p1_has_gun = (gun1.owner == player1 or gun2.owner == player1)
-        p2_has_gun = (gun1.owner == player2 or gun2.owner == player2)
+        p1_has_gun = any(g.owner == player1 for g in map_guns)
+        p2_has_gun = any(g.owner == player2 for g in map_guns)
 
         # Shooting uses held key so it respects the gun's own cooldown naturally
         if keys[pygame.K_f] and p1_has_gun:
-            shoot(gun1, player1, bullets, current_time, md.map_data)
-            shoot(gun2, player1, bullets, current_time, md.map_data)
+            for g in map_guns:
+                shoot(g, player1, bullets, current_time, md.map_data)
 
         if keys[pygame.K_RCTRL] and p2_has_gun:
-            shoot(gun1, player2, bullets, current_time, md.map_data)
-            shoot(gun2, player2, bullets, current_time, md.map_data)
+            for g in map_guns:
+                shoot(g, player2, bullets, current_time, md.map_data)
 
         # Melee uses single-press so one tap = one swing, can't hold to spam.
         # The swing animation ALWAYS plays on press (so the action is visible).
@@ -756,12 +759,19 @@ while True:
                         SFX_MELEE.play()
 
         # Gun pickup — a player who already owns a gun cannot pick up a second one
-        for g in (gun1, gun2):
+        # Gun pickup — a player who already owns a gun cannot pick up a second one
+        p1_owns_gun = any(g.owner == player1 for g in map_guns)
+        p2_owns_gun = any(g.owner == player2 for g in map_guns)
+        for g in map_guns:
             if g.pos:
-                p1_owns_gun = (gun1.owner == player1 or gun2.owner == player1)
-                p2_owns_gun = (gun1.owner == player2 or gun2.owner == player2)
                 if player1.pos == g.pos and not p1_owns_gun:
                     g.pickup(player1, current_time)
+                    p1_owns_gun = True
+                    if SFX_PICKUP:
+                        SFX_PICKUP.play()
+                elif player2.pos == g.pos and not p2_owns_gun:
+                    g.pickup(player2, current_time)
+                    p2_owns_gun = True
                     if SFX_PICKUP:
                         SFX_PICKUP.play()
 
@@ -771,40 +781,26 @@ while True:
                         SFX_PICKUP.play()
 
         # Gun expiry / ammo depletion / map despawn
-        for g, spawn_key in ((gun1, "last_gun1_spawn_time"),
-                              (gun2, "last_gun2_spawn_time")):
-            # Equipped gun: expired duration or out of ammo
-            expired = g.owner and g.pickup_time and (current_time - g.pickup_time >= g.duration)
-            empty   = g.owner and g.ammo <= 0
-            # Floor gun: sitting on the map past its duration
+        # Gun expiry / ammo depletion / map despawn + respawn for all 3 slots
+        for i, g in enumerate(map_guns):
+            expired     = g.owner and g.pickup_time and (current_time - g.pickup_time >= g.duration)
+            empty       = g.owner and g.ammo <= 0
             map_expired = (g.pos and g.type
                            and (current_time - g.map_spawn_time >= GUN_TYPES[g.type]["duration"]))
+
             if expired or empty:
                 g.drop(current_time)
-                if spawn_key == "last_gun1_spawn_time":
-                    last_gun1_spawn_time = current_time
-                else:
-                    last_gun2_spawn_time = current_time
+                gun_respawn_timers[i] = current_time
             elif map_expired:
-                g.pos            = None   # remove from map without crediting an owner
+                g.pos            = None
                 g.map_spawn_time = 0
-                if spawn_key == "last_gun1_spawn_time":
-                    last_gun1_spawn_time = current_time
-                else:
-                    last_gun2_spawn_time = current_time
+                gun_respawn_timers[i] = current_time
 
-        # Gun respawn (each independently)
-        for g, last_t in ((gun1, last_gun1_spawn_time),
-                           (gun2, last_gun2_spawn_time)):
+            # Respawn this slot if it has no gun on map and no owner
             if not g.pos and not g.owner:
-                if current_time - last_t >= GUN_RESPAWN_TIME:
-                    occ = _occupied_positions()
-                    if not g.spawn(md.map_data, current_time, occupied_positions=occ):
-                        # record updated timer
-                        if g is gun1:
-                            last_gun1_spawn_time = current_time
-                        else:
-                            last_gun2_spawn_time = current_time
+                if current_time - gun_respawn_timers[i] >= GUN_RESPAWN_TIME:
+                    if not g.spawn(md.map_data, current_time, occupied_positions=_occupied_positions()):
+                        gun_respawn_timers[i] = current_time  # retry next cycle
 
         # Armor respawn
         if not armor_pickup.pos:
@@ -839,11 +835,11 @@ while True:
         if hit_player:
             bullets.clear()
             # Drop gun on hit
-            for g in (gun1, gun2):
+            # Drop gun on hit
+            for i, g in enumerate(map_guns):
                 if g.owner == hit_player:
                     g.drop(current_time)
-                    last_gun1_spawn_time = current_time
-                    last_gun2_spawn_time = current_time
+                    gun_respawn_timers[i] = current_time
 
             if not armor_absorbed:
                 # Full hit: respawn at spawn tile
@@ -923,7 +919,8 @@ while True:
     draw_armor_pickup(screen)
 
     # Both gun pickups on the map
-    for g in (gun1, gun2):
+    # All gun pickups on the map
+    for g in map_guns:
         if g.pos:
             img    = GUN_TYPES[g.type]["map_image"]
             draw_x = (md.map_data.offset_x + g.pos[0] * TILE_SIZE
@@ -959,8 +956,8 @@ while True:
     draw_pet(screen, player1, p1_pet)
     draw_pet(screen, player2, p2_pet)
 
-    # Held guns (draw for both slots)
-    for g in (gun1, gun2):
+    # Held guns (draw for all slots)
+    for g in map_guns:
         draw_held_gun(screen, g, player1, md.map_data)
         draw_held_gun(screen, g, player2, md.map_data)
 
@@ -970,12 +967,12 @@ while True:
 
     # HUD — Player 1 top-left
     screen.blit(HUD_FONT.render(p1_name, True, (255, 255, 255)), (10, 10))
-    draw_weapon_ui(screen, gun1, gun2, player1, 10, 42)
+    draw_weapon_ui(screen, map_guns, player1, 10, 42)
     draw_health_bar(screen, player1, 10, 80) # Adjusted Y
 
     # HUD — Player 2 bottom-left
     screen.blit(HUD_FONT.render(p2_name, True, (255, 255, 255)), (10, HEIGHT - 115))
-    draw_weapon_ui(screen, gun1, gun2, player2, 10, HEIGHT - 80)
+    draw_weapon_ui(screen, map_guns, player2, 10, HEIGHT - 80)
     draw_health_bar(screen, player2, 10, HEIGHT - 40) # Adjusted Y
 
     if game_state == "playing":
